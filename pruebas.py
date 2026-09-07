@@ -3021,7 +3021,7 @@ if _CFG.is_file():
     _cfg = _CFG.read_text(encoding="utf-8").lower()
     for _clave, _token in (("backgroundcolor", "--superficie"),
                            ("secondarybackgroundcolor", "--plano"),
-                           ("textcolor", "--tinta"),
+                           ("textcolor", "--tinta-2"),
                            ("primarycolor", "--acento")):
         _m = _rex.search(rf'{_clave}\s*=\s*"(#[0-9a-f]{{6}})"', _cfg)
         _t = _rex.search(rf'{_token}:\s*(#[0-9a-f]{{6}})', _UI.ESTILO.lower())

@@ -78,6 +78,7 @@ ESTILO = """
   /* Aspecto — grises fríos (Slate) y azul corporativo (Blue 600) */
   --superficie:#f8fafc; --plano:#f1f5f9; --tinta:#0f172a; --tinta-2:#334155;
   --tinta-3:#64748b; --linea:#e2e8f0; --borde:rgba(15,23,42,.10);
+  --radio:.5rem;
   --acento:#2563eb; --acento-fuerte:#1d4ed8; --acento-suave:#eff6ff;
   --acento-borde:#bfdbfe;
   /* Significado — los cuatro desenlaces, revalidados sobre el fondo nuevo */
@@ -93,7 +94,10 @@ ESTILO = """
 .stApp { background: var(--superficie); }
 .block-container { padding-top: 3.4rem; max-width: 1180px; }
 
-h1, h2, h3 { letter-spacing: -.015em; }
+/* El texto base es Slate 700 (`--tinta-2`, el `foreground` de la paleta) y lo
+   pone Streamlit desde `config.toml`. Los titulares suben a Slate 900 para que
+   la jerarquía no dependa sólo del tamaño. */
+h1, h2, h3, h4 { letter-spacing: -.015em; color: var(--tinta); }
 h1 { font-weight: 650 !important; }
 
 /* --- Cabecera de sección ------------------------------------------------ */
@@ -108,7 +112,7 @@ h1 { font-weight: 650 !important; }
 /* --- Medidores de arco -------------------------------------------------- */
 .medidores{ display:flex; gap:.7rem; flex-wrap:wrap; margin:.2rem 0 1rem 0; }
 .medidor{
-  flex:1 1 165px; background:#fff; border:1px solid var(--borde); border-radius:14px;
+  flex:1 1 165px; background:#fff; border:1px solid var(--borde); border-radius:var(--radio);
   padding:.85rem .7rem .7rem .7rem; text-align:center;
 }
 .medidor svg{ display:block; margin:0 auto; }
@@ -122,11 +126,11 @@ h1 { font-weight: 650 !important; }
 
 /* --- Barra apilada de la batería ---------------------------------------- */
 .barra-envoltura{
-  background:#fff; border:1px solid var(--borde); border-radius:14px;
+  background:#fff; border:1px solid var(--borde); border-radius:var(--radio);
   padding:.9rem 1rem 1rem 1rem; margin:.2rem 0 1rem 0;
 }
 .barra{
-  display:flex; height:26px; border-radius:8px; overflow:hidden;
+  display:flex; height:26px; border-radius:var(--radio); overflow:hidden;
   border:1px solid var(--borde); background:var(--plano);
 }
 .barra .seg{
@@ -143,7 +147,7 @@ h1 { font-weight: 650 !important; }
 /* --- Franja de estado del sistema --------------------------------------- */
 .franja{
   background:linear-gradient(180deg,#fff 0%, var(--plano) 100%);
-  border:1px solid var(--borde); border-radius:16px;
+  border:1px solid var(--borde); border-radius:var(--radio);
   padding:1rem 1.15rem; margin:0 0 1.3rem 0;
 }
 .franja-cifras{ display:flex; gap:1.9rem; flex-wrap:wrap; margin-bottom:.9rem; }
@@ -155,7 +159,7 @@ h1 { font-weight: 650 !important; }
 .cadena{ display:flex; align-items:stretch; gap:0; flex-wrap:wrap; }
 .cadena .esl{
   flex:1 1 0; min-width:118px; background:#fff; border:1px solid var(--borde);
-  border-top:3px solid var(--tinta-3); border-radius:10px; padding:.5rem .6rem;
+  border-top:3px solid var(--tinta-3); border-radius:var(--radio); padding:.5rem .6rem;
   margin-right:.4rem;
 }
 .cadena .esl:last-child{ margin-right:0; }
@@ -166,11 +170,11 @@ h1 { font-weight: 650 !important; }
 /* --- Desglose esperado / observado -------------------------------------- */
 .desglose{ display:flex; gap:.9rem; flex-wrap:wrap; margin-top:.45rem; }
 .desglose > div{ flex:1 1 240px; font-size:.81rem; color:var(--tinta-2);
-  background:var(--plano); border-radius:8px; padding:.35rem .55rem; line-height:1.4; }
+  background:var(--plano); border-radius:var(--radio); padding:.35rem .55rem; line-height:1.4; }
 .desglose span{ display:block; font-size:.68rem; font-weight:700; letter-spacing:.06em;
   text-transform:uppercase; color:var(--tinta-3); margin-bottom:.1rem; }
 .sev{ margin-top:.35rem; font-size:.7rem; font-weight:700; letter-spacing:.05em;
-  text-transform:uppercase; text-align:center; border:1px solid; border-radius:6px;
+  text-transform:uppercase; text-align:center; border:1px solid; border-radius:var(--radio);
   padding:.1rem .35rem; }
 
 /* --- Pastillas ---------------------------------------------------------- */
@@ -197,11 +201,11 @@ h1 { font-weight: 650 !important; }
 
 /* --- Tarjetas de módulo ------------------------------------------------- */
 div[data-testid="stVerticalBlockBorderWrapper"]{
-  border-radius:14px !important; border:1px solid var(--borde) !important;
+  border-radius:var(--radio)!important; border:1px solid var(--borde) !important;
   background:#fff; transition:box-shadow .15s ease, transform .15s ease;
 }
 div[data-testid="stVerticalBlockBorderWrapper"]:hover{
-  box-shadow:0 6px 20px rgba(11,11,11,.07); transform:translateY(-1px);
+  box-shadow:0 6px 20px rgba(15,23,42,.07); transform:translateY(-1px);
 }
 .tarjeta-nombre{ font-size:1.02rem; font-weight:650; margin:.1rem 0 .1rem 0; }
 .tarjeta-quien{ color:var(--tinta-2); font-size:.83rem; margin-bottom:.55rem; }
@@ -211,14 +215,14 @@ div[data-testid="stVerticalBlockBorderWrapper"]:hover{
               padding-top:.5rem; margin-top:.55rem; }
 
 /* --- Botones ------------------------------------------------------------ */
-div.stButton > button{ border-radius:9px; font-weight:600; border:1px solid var(--borde); }
-div.stButton > button[kind="primary"]{ border:none; box-shadow:0 1px 2px rgba(11,11,11,.14); }
+div.stButton > button{ border-radius:var(--radio); font-weight:600; border:1px solid var(--borde); }
+div.stButton > button[kind="primary"]{ border:none; box-shadow:0 1px 2px rgba(15,23,42,.14); }
 div.stButton > button:disabled{ color:var(--tinta-3); }
 
 /* --- KPI ---------------------------------------------------------------- */
 .kpis{ display:flex; gap:.7rem; flex-wrap:wrap; margin:.2rem 0 1rem 0; }
 .kpi{ flex:1 1 150px; background:#fff; border:1px solid var(--borde);
-      border-radius:12px; padding:.75rem .9rem; }
+      border-radius:var(--radio); padding:.75rem .9rem; }
 .kpi .k-et{ font-size:.74rem; color:var(--tinta-2); font-weight:600;
             text-transform:uppercase; letter-spacing:.05em; }
 .kpi .k-v{ font-size:1.75rem; font-weight:650; line-height:1.25; margin-top:.15rem; }
@@ -229,7 +233,7 @@ div.stButton > button:disabled{ color:var(--tinta-3); }
 
 /* --- Casos -------------------------------------------------------------- */
 .caso{ display:flex; gap:.8rem; align-items:flex-start; padding:.7rem .9rem;
-       border:1px solid var(--borde); border-left-width:4px; border-radius:10px;
+       border:1px solid var(--borde); border-left-width:4px; border-radius:var(--radio);
        background:#fff; margin-bottom:.45rem; }
 .caso--pasa{ border-left-color:var(--bien-marca); }
 .caso--no_pasa{ border-left-color:var(--mal-marca); }
@@ -247,7 +251,7 @@ div.stButton > button:disabled{ color:var(--tinta-3); }
 
 /* --- Avisos ------------------------------------------------------------- */
 .nota{ background:var(--plano); border-left:3px solid var(--tinta-3);
-       padding:.6rem .85rem; border-radius:0 8px 8px 0; color:var(--tinta-2);
+       padding:.6rem .85rem; border-radius:0 var(--radio) var(--radio) 0; color:var(--tinta-2);
        font-size:.87rem; line-height:1.5; margin:.4rem 0 .9rem 0; }
 .nota--espera{ background:var(--espera-fondo); border-left-color:var(--espera-marca);
                color:var(--espera); }
@@ -298,7 +302,7 @@ div.stButton > button:disabled{ color:var(--tinta-3); }
 .hilo-cuerpo p b{ color:var(--tinta); font-weight:640; }
 .hilo-falta{
   background:var(--espera-fondo); border:1px solid var(--espera-borde);
-  border-left:3px solid var(--espera-marca); border-radius:0 8px 8px 0;
+  border-left:3px solid var(--espera-marca); border-radius:0 var(--radio) var(--radio) 0;
   padding:.55rem .8rem; font-size:.85rem; color:var(--espera); line-height:1.55;
   margin-top:.55rem;
 }
@@ -355,7 +359,7 @@ div.stButton > button:disabled{ color:var(--tinta-3); }
 .org-tu{
   display:flex; align-items:center; gap:.6rem; flex-wrap:wrap;
   background:var(--acento-suave); border:1px solid var(--acento-borde);
-  border-radius:12px; padding:.6rem .85rem; margin:.6rem 0 .2rem 0;
+  border-radius:var(--radio); padding:.6rem .85rem; margin:.6rem 0 .2rem 0;
 }
 .org-tu .t-e{ font-size:.7rem; font-weight:700; letter-spacing:.08em;
               text-transform:uppercase; color:var(--acento-fuerte); }
@@ -366,7 +370,7 @@ div.stButton > button:disabled{ color:var(--tinta-3); }
 .cadena-pasos{ display:flex; gap:.5rem; flex-wrap:wrap; margin:.5rem 0 .8rem 0; }
 .cadena-pasos .cp{
   flex:1 1 220px; background:#fff; border:1px solid var(--borde);
-  border-left:3px solid var(--nulo-marca); border-radius:0 10px 10px 0;
+  border-left:3px solid var(--nulo-marca); border-radius:0 var(--radio) var(--radio) 0;
   padding:.6rem .8rem;
 }
 .cadena-pasos .cp--hecho{ border-left-color:var(--bien-marca); }
@@ -383,7 +387,7 @@ div.stButton > button:disabled{ color:var(--tinta-3); }
 .lecturas{ display:flex; gap:.7rem; flex-wrap:wrap; margin:.3rem 0 .6rem 0; }
 .lectura{
   flex:1 1 260px; background:#fff; border:1px solid var(--borde);
-  border-left:3px solid var(--espera-marca); border-radius:0 10px 10px 0;
+  border-left:3px solid var(--espera-marca); border-radius:0 var(--radio) var(--radio) 0;
   padding:.65rem .8rem;
 }
 .lectura .l-a{ font-size:.72rem; font-weight:700; letter-spacing:.06em;
@@ -393,7 +397,7 @@ div.stButton > button:disabled{ color:var(--tinta-3); }
 
 /* --- Esquema ------------------------------------------------------------ */
 .esquema{ width:100%; background:#fff; border:1px solid var(--borde);
-          border-radius:14px; padding:.5rem; overflow-x:auto; }
+          border-radius:var(--radio); padding:.5rem; overflow-x:auto; }
 </style>
 """
 
