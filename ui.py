@@ -24,7 +24,7 @@ import streamlit as st
 # viejo también tenía todas las funciones por nombre, la comprobación dio el
 # visto bueno. Lo que había cambiado era la **firma** de una de ellas, no su
 # existencia. Un número por fichero detecta lo que un `hasattr` no ve.
-VERSION_UI = 17
+VERSION_UI = 18
 
 from nucleo import bateria as B  # noqa: F401  (lo usa app.py)
 from nucleo import asesor as AS
@@ -479,6 +479,38 @@ div.stButton > button:disabled{ color:var(--tinta-3); }
 .mem-fila .m-q{ color:var(--tinta-2); flex:1 1 auto; }
 .mem-fila .m-w{ color:var(--tinta-3); font-size:.76rem; flex:none; }
 
+/* --- Recepción: los documentos entrando ---------------------------------- */
+/* Cada documento aparece con su tipo y lo que se ha leído de él. La fila que
+   dispara una alarma se marca en rojo: lo que hay que ver es el momento exacto
+   en que el sistema se da cuenta, no el resultado ya cocinado. */
+.recibo{
+  background:#fff; border:1px solid var(--borde); border-radius:var(--radio);
+  overflow:hidden; margin:.3rem 0 .8rem 0;
+}
+.recibo-cab{
+  display:flex; align-items:baseline; gap:.7rem; background:var(--plano);
+  padding:.5rem .8rem; border-bottom:1px solid var(--linea);
+}
+.recibo-cab .r-t{ font-size:.74rem; font-weight:700; letter-spacing:.08em;
+                  text-transform:uppercase; color:var(--tinta-3); }
+.recibo-cab .r-n{ font-size:.78rem; color:var(--tinta-3); margin-left:auto; }
+.recibo-fila{
+  display:flex; align-items:center; gap:.7rem; padding:.45rem .8rem;
+  border-bottom:1px solid var(--linea); font-size:.85rem;
+}
+.recibo-fila:last-child{ border-bottom:none; }
+.recibo-fila .f-i{ width:1.2rem; text-align:center; flex:none; }
+.recibo-fila .f-n{ flex:1 1 auto; min-width:0; color:var(--tinta);
+                   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.recibo-fila .f-c{ font-size:.78rem; color:var(--tinta-3); flex:none;
+                   font-variant-numeric:tabular-nums; }
+.recibo-fila .f-e{ font-size:.72rem; font-weight:700; letter-spacing:.05em;
+                   text-transform:uppercase; flex:none; }
+.recibo-fila .f--ok .f-e, .recibo-fila.f--ok .f-e{ color:var(--bien); }
+.recibo-fila.f--mal{ background:var(--mal-fondo); }
+.recibo-fila.f--mal .f-e{ color:var(--mal); }
+.recibo-fila.f--espera .f-e{ color:var(--espera); }
+
 /* --- Naturaleza: qué capa resuelve cada pantalla ------------------------- */
 /* Del customer journey de Fabián. No es decoración: es una afirmación sobre el
    sistema, y por eso las etiquetas se leen distinto según sea algo que actúa
@@ -909,6 +941,36 @@ def cabecera_fase(n, fase, titulo, responsable, estado="ejecutada"):
         f'<div class="fase-tit">{_e(titulo)}</div>'
         f'<div class="fase-quien">{_e(responsable)}</div></div></div>',
         unsafe_allow_html=True)
+
+
+GLIFO_ESTADO = {"limpio": "✓", "incidencia": "✕", "incompleto": "◌",
+                "leyendo": "·"}
+
+
+def recibo(titulo, filas, pie=None, estado=None):
+    """
+    Un lote de documentos entrando, con lo que se ha leído de cada uno.
+
+    Es la pantalla 2 del guion —entrada y procesamiento— y su valor está en el
+    tiempo: los documentos aparecen de uno en uno y la alarma salta al final,
+    delante de quien mira. Una tabla que aparece entera cuenta el resultado; esto
+    cuenta **el trabajo**, que es lo que hay que ver para creérselo.
+    """
+    clase = {"incidencia": "f--mal", "limpio": "f--ok",
+             "incompleto": "f--espera"}.get(estado, "")
+    cuerpo = "".join(
+        f'<div class="recibo-fila {clase if f.get("dispara") else ""}">'
+        f'<div class="f-i">{GLIFO_TIPO.get(f.get("tipo"), "·")}</div>'
+        f'<div class="f-n">{_e(f["nombre"])}</div>'
+        f'<div class="f-c">{_e(f.get("leido") or "")}</div>'
+        f'<div class="f-e">{_e(f.get("estado") or "")}</div></div>'
+        for f in filas)
+    cab = (f'<div class="recibo-cab"><div class="r-t">{_e(titulo)}</div>'
+           f'<div class="r-n">{len(filas)} documentos</div></div>')
+    st.markdown(f'<div class="recibo">{cab}{cuerpo}</div>',
+                unsafe_allow_html=True)
+    if pie:
+        st.markdown(pie)
 
 
 CLASE_CAPA = {"IA": "n--ia", "Determinista": "n--det", "Humana": "n--hum"}

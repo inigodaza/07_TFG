@@ -89,6 +89,25 @@ def _contractuales(docs):
     return salida
 
 
+def lotes(docs):
+    """
+    Los documentos repartidos en lotes tal como llegarían: por carpeta.
+
+    En una empresa la documentación no entra de golpe ni ordenada por pedido:
+    entra por tandas, según la va mandando el cliente o la va generando
+    producción. Cada carpeta de la bandeja es una tanda, y poder recibirlas por
+    separado es lo que permite enseñar el sistema **reaccionando** en vez de
+    enseñar un resultado ya cocinado.
+    """
+    from pathlib import Path
+    salida = {}
+    for d in docs:
+        ruta = d.get("ruta")
+        carpeta = Path(ruta).parent.name if ruta else "sueltos"
+        salida.setdefault(carpeta, []).append(d)
+    return dict(sorted(salida.items()))
+
+
 def arrancar(docs, clasificar=None, modo="determinista"):
     """
     Lo que el sistema ya ha hecho antes de que nadie mire.

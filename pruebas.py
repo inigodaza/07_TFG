@@ -3008,6 +3008,27 @@ if _EJEMPLO:
     import tempfile as _tmp
     _ruta_mem = _Path(_tmp.mkdtemp()) / "memoria.json"
 
+    # La recepción: los documentos entran por tandas, no de golpe.
+    _lotes = _CON_S.lotes(_docs_ej)
+    comprobar(set(_lotes) == {"90001", "90002", "90003", "expediente"},
+              "La documentación entra repartida en tandas, como llegaría de "
+              "verdad: tres pedidos y el expediente del cliente",
+              str(sorted(_lotes)))
+    _solo_uno = _CON_S.arrancar(_lotes["90001"], A.clasificar)
+    comprobar(not _solo_uno["alarmas"] and len(_solo_uno["limpios"]) == 1,
+              "Recibiendo sólo la primera tanda no salta ninguna alarma: el "
+              "sistema no avisa de lo que todavía no ha visto")
+    _dos = _CON_S.arrancar(_lotes["90001"] + _lotes["90002"], A.clasificar)
+    comprobar(len(_dos["alarmas"]) == 1,
+              "…y al entrar la segunda salta una, y sólo una. Que la alarma "
+              "aparezca CUANDO entra el documento es lo que hace creíble que el "
+              "sistema la ha encontrado en vez de tenerla escrita")
+    _tres = _CON_S.arrancar([d for ds in _lotes.values() for d in ds],
+                            A.clasificar)
+    comprobar(len(_tres["alarmas"]) == 2 and len(_tres["contratos"]) == 1,
+              "Con todo dentro: dos alarmas y el contrato apartado del conteo "
+              "de pedidos")
+
     _al = _est_ej["alarmas"][0]
     _ctx_bajo = _CON_S.contexto_operario("Encargados de Turno", _al)
     _ctx_alto = _CON_S.contexto_operario("Dir. Producción", _al)

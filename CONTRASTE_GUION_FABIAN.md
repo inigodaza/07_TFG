@@ -16,22 +16,22 @@ puntos creo que conviene discutir.
 
 | # | Pantalla del guion | Estado | Qué hace de verdad |
 |---|---|---|---|
-| 0 | El sistema trabaja en segundo plano | ✔ | Al abrir, ya hay 10 documentos leídos y una cola de alarmas. Nadie ha pulsado nada |
+| 0 | El sistema trabaja en segundo plano | ✔ | Procesa cada tanda en cuanto entra y deja la cola de alarmas hecha. Nadie ha pedido que se revise nada |
 | 1 | Entrada y contexto del usuario | ✔ | Pantalla de entrada con rol, nivel, área, tipo de autoridad y sobre qué manda — leído de la ontología |
-| 2 | Entrada y procesamiento | ✔ | Marcador **«2 correctos · 2 incidencias»** sobre los 3 pedidos de la bandeja |
-| 3 | Alerta | ✔ | «Pedido 3.000 · Orden 30.000», con gravedad, documentos afectados y acción |
+| 2 | Entrada y procesamiento | ✔ | **Pantalla de recepción**: la documentación entra por tandas y se procesa a la vista, documento a documento |
+| 3 | Alerta | ✔ | «Posible incongruencia · Pedido 3.000 · Orden 30.000» salta al terminar de leer la tanda, con la fila del documento que la disparó marcada |
 | 4 | Dashboard de la incidencia | ✔ | Un centro de control: alarma, contexto, tres herramientas y actuación |
 | 5 | Evidencia y diagnóstico | ✔ | **Fragmento literal de cada documento**, con el valor resaltado y su línea, y el estado del diagnóstico |
 | 6 | Autoridad y permisos | ✔ | «Puedes proponer · cerrarla le corresponde a Dir. Producción, CEO» |
 | 7 | Decisión y captura del criterio | ✔ | Aceptar · corregir · escalar, **con justificación obligatoria** |
 | 8 | Cierre, memoria y aprendizaje | ✔ | Registro de criterio con las dos columnas, y el precedente en el caso siguiente |
 
-**Recorrido probado de extremo a extremo**: entrar como encargado → atender la
+**Recorrido probado de extremo a extremo**: identificarse → recibir dos tandas y ver saltar la alarma → atender la
 alarma del 90002 → proponer con justificación → cambiar a director (que ve la
 justificación previa) → cerrar → ver el registro de criterio → volver a la cola →
 atender el 90003 y **encontrar el precedente puesto**.
 
-598 comprobaciones automáticas en verde, de las cuales 36 cubren lo que se añadió
+602 comprobaciones automáticas en verde, de las cuales 40 cubren lo que se añadió
 por este guion.
 
 ---
@@ -108,6 +108,13 @@ es. La misma decisión, dos veredictos.
 ---
 
 ## 4 · Lo que he añadido al guion, y por qué
+
+**La documentación entra por tandas, y se puede meter más en cualquier momento.**
+Tu pantalla 0 dice que el sistema vigila en segundo plano, y eso es cierto — pero
+si al abrir la aplicación la alarma ya está ahí, no se ve de dónde sale. Ahora se
+recibe una tanda, se ve procesarse y la alarma salta al final. Y se puede dejar
+una sin recibir, entrar en la consola, y meterla después para verla saltar en
+vivo. Es lo que distingue un sistema en marcha de un guion.
 
 **Justificación obligatoria, también al proponer.** Tu pantalla 7 dice «el
 encargado propone y justifica». Lo he hecho bloqueante y **antes** de comprobar

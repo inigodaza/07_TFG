@@ -647,6 +647,20 @@ solo precedente se enseña pero no se ofrece aplicarlo —una vez es una anécdo
 con dos coincidentes se ofrece como atajo, y si las veces anteriores se resolvió
 de formas distintas, se enseña el reparto y **no se elige**.
 
+### La recepción: ver entrar los documentos
+
+La pantalla 2 del guion, y la que hace creíble todo lo demás. Una alarma que ya
+está ahí cuando se abre la aplicación no enseña de dónde sale.
+
+La documentación entra **por tandas** —cada carpeta es una— y se procesa a la
+vista: los documentos aparecen de uno en uno, el pedido que cuadra sale en verde
+y el que no levanta la alarma en rojo, con la fila del documento que la disparó
+marcada. Se puede dejar una tanda sin recibir, entrar en la consola, y meterla
+después: la alarma salta entonces, delante de quien esté mirando.
+
+Eso último es lo que distingue un sistema en marcha de un guion, y es lo que
+conviene guardarse para el final de la demostración.
+
 ### La etiqueta «Naturaleza»
 
 Del customer journey de Fabián del 9/09. Cada pantalla declara qué capa la
@@ -700,7 +714,7 @@ la nada convierte una demostración en un folleto.
 ## 11 · Estado de comprobación
 
 ```
-python pruebas.py                →  598 comprobaciones en verde
+python pruebas.py                →  602 comprobaciones en verde
 python prueba_generalizacion.py  →   38 comprobaciones en verde
 python prueba_linea_hilo.py      →   genera la página y la deja mirable
 ```
