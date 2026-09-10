@@ -588,10 +588,119 @@ Sale calculada del propio sistema: cada caso no ejercitado declara qué haría f
 
 ---
 
-## 10 · Estado de comprobación
+## 10 · La consola: cómo funcionaría la aplicación
+
+Esto es lo único del proyecto que **no** es evaluación, y está separado a
+propósito. La pantalla «Consola» enseña el producto que el equipo construiría con
+las cinco piezas juntas; «Evaluar un módulo» enseña este bloque haciendo su
+trabajo. Confundirlos sería el error más caro de todos: una demostración bonita
+que no distingue lo que funciona de lo que se ha ensayado.
+
+Sigue el esquema que fijó Fabián el 7 de septiembre, y su idea central es que **el
+sistema ya está rodando cuando alguien abre la pantalla**. No hay asistente ni
+barra de progreso: hay una cola de alarmas que se ha producido sola.
+
+### Flujo continuo
+
+Entra documentación —presupuestos, pedidos de cliente, órdenes de fabricación— y
+el sistema la agrupa por pedido usando el ISBN, contrasta cada grupo consigo
+mismo y deja una cola de alarmas. De diez documentos, despacha un pedido sin
+molestar a nadie y levanta dos alarmas. **Que despache alguno es lo que demuestra
+que distingue**; un sistema que avisa de todo lo que mira no vale nada.
+
+### Herramientas de análisis
+
+Tres, sobre la alarma que se esté atendiendo:
+
+| Herramienta | Módulo | Qué hace de verdad |
+|---|---|---|
+| Incongruencias | Juan Salas | el detalle campo a campo, y el contraste contra la salida del módulo |
+| Diligencia | Martín de Lucas | lee el contrato marco: vigente hasta 03/2027, preaviso de 60 días |
+| Similitud | Álvaro Subias | **declara que no puede contestar**: su histórico es de otro dominio |
+
+La tercera es la más importante de las tres para lo que este bloque defiende.
+Disfrazar la salida de un dominio como si fuera del otro habría sido fácil y
+habría quedado mejor en la demo; es exactamente lo que este proyecto existe para
+detectar.
+
+### Ontología, permisos y actuación
+
+La consola determina qué puede hacer el operario **a partir de la alarma que
+tiene delante**: la misma persona puede cerrar una y no poder tocar otra. Nivel 3
+del área propone y la decisión no se guarda del todo; nivel 2 cierra. A quien no
+le corresponde no se le enseñan botones apagados: se le enseña el único que tiene
+sentido. Y hay tres acciones, no una — aceptar, corregir o escalar.
+
+### Aprendizaje y memoria
+
+Cada decisión se registra en `nucleo/memoria.py`. Cuando llega otra incidencia de
+la misma **clase** —mismo campo, misma dirección de la discrepancia— la consola
+la reconoce y ofrece el precedente: *«esto ya se resolvió, así, y lo validó
+fulano»*. 3.000 contra 30.000 y 800 contra 8.000 son el mismo problema aunque no
+sean los mismos números.
+
+No hay ningún modelo entrenado, y la diferencia importa: un precedente se puede
+abrir, leer y discutir, y una predicción de una caja negra no. En un sistema cuyo
+argumento entero es que ninguna discrepancia se convierte en verdad sin
+evidencia, meter una caja negra en el último paso sería contradecirse. Con un
+solo precedente se enseña pero no se ofrece aplicarlo —una vez es una anécdota—;
+con dos coincidentes se ofrece como atajo, y si las veces anteriores se resolvió
+de formas distintas, se enseña el reparto y **no se elige**.
+
+### La etiqueta «Naturaleza»
+
+Del customer journey de Fabián del 9/09. Cada pantalla declara qué capa la
+resuelve —IA, reglas o persona— y en qué estado: **actúa** hoy, está
+**disponible** pero apagada, o está **prevista**. El recuento es el dato que
+contesta con números la pregunta de dónde hace falta IA:
+
+| | Pantallas que resuelve hoy |
+|---|---|
+| Determinista | 9 de 9 |
+| Humana | 2 |
+| IA | 0 · prevista en 4 · disponible en 2 |
+
+Ese cero no se disimula. Marcar como IA algo que resuelve una expresión regular
+haría la demostración más vendible y la conversación más pobre, porque lo que hay
+que decidir es **dónde hace falta**. Vive en `demo/naturaleza.py` y se comprueba
+desde `pruebas.py`: lo que la pantalla dice de sí misma tiene que coincidir con
+lo que hace el código.
+
+### Evidencia con cita literal
+
+La pantalla 5 del guion. Cada afirmación enfrentada trae el **fragmento exacto**
+del documento donde aparece el valor, con el número resaltado y su línea. Y un
+diagnóstico de cuatro estados —error probable, cambio documentado, evidencia
+insuficiente, requiere decisión humana— que sale de comparar la documentación de
+cliente entre sí, no de una opinión. Si el valor no se localiza en el texto, se
+declara «evidencia insuficiente» en vez de inventarse una cita.
+
+### El registro de criterio
+
+Al validar no se guarda un número: se guarda un criterio con dos mitades.
+**Registro trazable** —patrón, diagnóstico, decisión, justificación, evidencias,
+responsable, fecha y versión— permite auditar la decisión después. **Contexto de
+reutilización** —cliente, producto, tipo de documento e incidencia, roles
+autorizados— permite saber si el criterio *aplica* a un caso nuevo: si es de otro
+cliente, el precedente se descarta y se dice por qué.
+
+La justificación es obligatoria, y se exige **antes** que los permisos: una
+propuesta sin motivo le deja al que valida el mismo trabajo que si no la hubiera.
+
+### Lo que la consola reproduce y no demuestra
+
+Dicho en su propia pantalla: la salida del módulo de Juan **se le entrega** al
+sistema, que es la frontera del apartado 1; la cadena de validación aplica la
+regla del módulo de Mencía pero no es su salida; y el coste en euros no se
+calcula salvo que alguien escriba el coste unitario, porque una cifra sacada de
+la nada convierte una demostración en un folleto.
+
+---
+
+## 11 · Estado de comprobación
 
 ```
-python pruebas.py                →  557 comprobaciones en verde
+python pruebas.py                →  598 comprobaciones en verde
 python prueba_generalizacion.py  →   38 comprobaciones en verde
 python prueba_linea_hilo.py      →   genera la página y la deja mirable
 ```

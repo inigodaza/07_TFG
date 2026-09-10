@@ -24,7 +24,7 @@ import streamlit as st
 # viejo también tenía todas las funciones por nombre, la comprobación dio el
 # visto bueno. Lo que había cambiado era la **firma** de una de ellas, no su
 # existencia. Un número por fichero detecta lo que un `hasattr` no ve.
-VERSION_UI = 14
+VERSION_UI = 17
 
 from nucleo import bateria as B  # noqa: F401  (lo usa app.py)
 from nucleo import asesor as AS
@@ -395,6 +395,257 @@ div.stButton > button:disabled{ color:var(--tinta-3); }
 .lectura .l-m{ font-size:.95rem; font-weight:650; margin:.15rem 0 .25rem 0; }
 .lectura .l-p{ font-size:.81rem; color:var(--tinta-2); line-height:1.5; }
 
+/* --- La consola ---------------------------------------------------------- */
+/* La barra de arriba existe para una sola cosa: que se vea que el sistema NO
+   está esperando a que alguien pulse algo. Lleva rato funcionando y quien abre
+   la pantalla llega a lo que ya ha ocurrido. */
+.consola-barra{
+  display:flex; align-items:center; gap:1rem; flex-wrap:wrap;
+  background:#fff; border:1px solid var(--borde); border-radius:var(--radio);
+  padding:.6rem .95rem; margin:0 0 .8rem 0;
+}
+.consola-barra .c-marca{ font-weight:680; letter-spacing:-.01em;
+                         color:var(--tinta); font-size:.98rem; }
+.consola-barra .c-sep{ flex:1 1 auto; }
+.vivo{ display:inline-flex; align-items:center; gap:.45rem; font-size:.8rem;
+       color:var(--bien); font-weight:600; }
+.vivo .punto{
+  width:8px; height:8px; border-radius:50%; background:var(--bien-marca);
+  box-shadow:0 0 0 0 rgba(0,99,0,.5); animation:latido 2s infinite;
+}
+@keyframes latido{
+  0%{ box-shadow:0 0 0 0 rgba(0,99,0,.45); }
+  70%{ box-shadow:0 0 0 7px rgba(0,99,0,0); }
+  100%{ box-shadow:0 0 0 0 rgba(0,99,0,0); }
+}
+@media (prefers-reduced-motion: reduce){ .vivo .punto{ animation:none; } }
+.consola-barra .c-op{ font-size:.82rem; color:var(--tinta-2); }
+.consola-barra .c-op b{ color:var(--tinta); }
+
+/* Una alarma en la cola */
+.alarma{
+  background:#fff; border:1px solid var(--borde);
+  border-left:4px solid var(--mal-marca); border-radius:0 var(--radio) var(--radio) 0;
+  padding:.75rem .95rem; margin-bottom:.5rem;
+}
+.alarma .al-c{ display:flex; align-items:baseline; gap:.6rem; flex-wrap:wrap; }
+.alarma .al-p{ font-size:.72rem; font-weight:700; letter-spacing:.09em;
+               text-transform:uppercase; color:var(--mal); }
+.alarma .al-r{ font-size:.78rem; color:var(--tinta-3); }
+.alarma .al-t{ font-size:1.02rem; font-weight:650; color:var(--tinta);
+               margin:.15rem 0 .1rem 0; }
+.alarma .al-d{ font-size:.85rem; color:var(--tinta-2); line-height:1.5; }
+
+/* Quién eres y qué puedes hacer con esta alarma */
+.ctx{
+  display:flex; gap:.6rem; flex-wrap:wrap; margin:.3rem 0 .8rem 0;
+}
+.ctx > div{
+  flex:1 1 190px; background:var(--plano); border-radius:var(--radio);
+  padding:.6rem .8rem;
+}
+.ctx .x-e{ font-size:.66rem; font-weight:700; letter-spacing:.1em;
+           text-transform:uppercase; color:var(--tinta-3); }
+.ctx .x-v{ font-size:.95rem; font-weight:650; color:var(--tinta);
+           margin-top:.1rem; line-height:1.3; }
+.ctx .x-n{ font-size:.76rem; color:var(--tinta-3); margin-top:.15rem;
+           line-height:1.4; }
+.ctx .x--puede{ background:var(--bien-fondo); }
+.ctx .x--puede .x-v{ color:var(--bien); }
+.ctx .x--no{ background:var(--espera-fondo); }
+.ctx .x--no .x-v{ color:var(--espera); }
+
+/* El precedente */
+.precedente{
+  background:linear-gradient(180deg,var(--acento-suave),#fff 70%);
+  border:1px solid var(--acento-borde); border-left:4px solid var(--acento);
+  border-radius:0 var(--radio) var(--radio) 0; padding:.8rem 1rem;
+  margin:.3rem 0 .8rem 0;
+}
+.precedente .pr-e{ font-size:.68rem; font-weight:700; letter-spacing:.1em;
+                   text-transform:uppercase; color:var(--acento-fuerte); }
+.precedente .pr-t{ font-size:1.02rem; font-weight:650; color:var(--tinta);
+                   margin:.12rem 0 .2rem 0; }
+.precedente .pr-d{ font-size:.85rem; color:var(--tinta-2); line-height:1.55; }
+
+/* La memoria */
+.memoria{ background:#fff; border:1px solid var(--borde);
+          border-radius:var(--radio); overflow:hidden; }
+.mem-fila{ display:flex; gap:.7rem; align-items:baseline; padding:.45rem .8rem;
+           border-bottom:1px solid var(--linea); font-size:.84rem; }
+.mem-fila:last-child{ border-bottom:none; }
+.mem-fila .m-p{ font-weight:650; color:var(--tinta); flex:none;
+                font-variant-numeric:tabular-nums; }
+.mem-fila .m-q{ color:var(--tinta-2); flex:1 1 auto; }
+.mem-fila .m-w{ color:var(--tinta-3); font-size:.76rem; flex:none; }
+
+/* --- Naturaleza: qué capa resuelve cada pantalla ------------------------- */
+/* Del customer journey de Fabián. No es decoración: es una afirmación sobre el
+   sistema, y por eso las etiquetas se leen distinto según sea algo que actúa
+   hoy, algo disponible pero apagado, o algo previsto y no hecho. */
+.nat{ display:flex; gap:.4rem; flex-wrap:wrap; align-items:center;
+      margin:.15rem 0 .6rem 0; }
+.nat .n-e{
+  display:inline-flex; align-items:center; gap:.35rem; border-radius:999px;
+  padding:.1rem .55rem; font-size:.68rem; font-weight:700; letter-spacing:.06em;
+  text-transform:uppercase; border:1px solid;
+}
+.nat .n--ia{ color:#6b21a8; border-color:#e9d5ff; background:#faf5ff; }
+.nat .n--det{ color:var(--acento-fuerte); border-color:var(--acento-borde);
+              background:var(--acento-suave); }
+.nat .n--hum{ color:#92400e; border-color:#fde3c0; background:#fff7ed; }
+/* Lo que no corre hoy se ve que no corre: discontinuo y sin fondo. */
+.nat .n--off{ background:transparent; border-style:dashed; opacity:.75; }
+.nat-pie{ font-size:.76rem; color:var(--tinta-3); line-height:1.5;
+          margin:-.3rem 0 .8rem 0; }
+
+/* --- Ficha de sesión ----------------------------------------------------- */
+.sesion{
+  background:linear-gradient(180deg,#fff,var(--plano));
+  border:1px solid var(--borde); border-radius:var(--radio);
+  padding:1.1rem 1.3rem; margin:.3rem 0 1rem 0;
+}
+.sesion .s-n{ font-size:1.45rem; font-weight:680; letter-spacing:-.02em;
+              color:var(--tinta); line-height:1.2; }
+.sesion .s-r{ font-size:.9rem; color:var(--tinta-2); margin-top:.15rem; }
+.sesion-campos{ display:flex; gap:1.6rem; flex-wrap:wrap; margin-top:.9rem; }
+.sesion-campos > div{ min-width:120px; }
+.sesion-campos .s-e{ font-size:.66rem; font-weight:700; letter-spacing:.1em;
+                     text-transform:uppercase; color:var(--tinta-3); }
+.sesion-campos .s-v{ font-size:.92rem; font-weight:650; color:var(--tinta);
+                     margin-top:.1rem; }
+
+/* --- Evidencia: las dos afirmaciones con su cita ------------------------- */
+.evi{ display:flex; gap:.6rem; flex-wrap:wrap; margin:.4rem 0 .5rem 0; }
+.evi > div{
+  flex:1 1 260px; background:#fff; border:1px solid var(--borde);
+  border-top:3px solid var(--nulo-marca); border-radius:var(--radio);
+  padding:.75rem .9rem;
+}
+.evi .ev--cli{ border-top-color:var(--acento); }
+.evi .ev--ord{ border-top-color:var(--mal-marca); }
+.evi .e-q{ font-size:.66rem; font-weight:700; letter-spacing:.1em;
+           text-transform:uppercase; color:var(--tinta-3); }
+.evi .e-v{ font-size:1.5rem; font-weight:680; letter-spacing:-.02em;
+           color:var(--tinta); line-height:1.25; }
+.evi .ev--ord .e-v{ color:var(--mal); }
+.evi .e-d{ font-size:.75rem; color:var(--tinta-3); margin:.1rem 0 .4rem 0;
+           overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cita{
+  font-family:ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size:.75rem; line-height:1.55; color:var(--tinta-2);
+  background:var(--plano); border-left:2px solid var(--linea);
+  border-radius:0 6px 6px 0; padding:.4rem .55rem; margin-top:.2rem;
+  overflow-x:auto; white-space:nowrap;
+}
+.cita b{ color:var(--tinta); background:#fde68a; padding:0 .12rem;
+         border-radius:2px; }
+.cita-pie{ font-size:.7rem; color:var(--tinta-3); margin-top:.2rem; }
+
+/* --- Registro de criterio ------------------------------------------------ */
+.criterio{ display:flex; gap:.7rem; flex-wrap:wrap; margin:.4rem 0 .6rem 0; }
+.criterio > div{
+  flex:1 1 280px; background:#fff; border:1px solid var(--borde);
+  border-radius:var(--radio); padding:.8rem .95rem;
+}
+.criterio .c-t{ font-size:.9rem; font-weight:680; color:var(--tinta);
+                margin-bottom:.4rem; }
+.criterio dl{ margin:0; }
+.criterio dt{ font-size:.66rem; font-weight:700; letter-spacing:.09em;
+              text-transform:uppercase; color:var(--tinta-3); margin-top:.45rem; }
+.criterio dd{ margin:.05rem 0 0 0; font-size:.85rem; color:var(--tinta);
+              line-height:1.45; }
+
+/* --- El recorrido de la demo -------------------------------------------- */
+.pasos{ display:flex; gap:.35rem; margin:.2rem 0 1.4rem 0; flex-wrap:wrap; }
+.pasos .p{
+  flex:1 1 120px; padding:.45rem .6rem .5rem .6rem; border-radius:var(--radio);
+  background:var(--plano); border:1px solid transparent;
+}
+.pasos .p--hecho{ background:var(--bien-fondo); }
+.pasos .p--aqui{ background:#fff; border-color:var(--acento);
+                 box-shadow:0 2px 10px rgba(37,99,235,.14); }
+.pasos .p-n{ font-size:.66rem; font-weight:700; letter-spacing:.1em;
+             text-transform:uppercase; color:var(--tinta-3); }
+.pasos .p--aqui .p-n{ color:var(--acento-fuerte); }
+.pasos .p-t{ font-size:.82rem; font-weight:650; color:var(--tinta);
+             line-height:1.25; margin-top:.1rem; }
+.pasos .p--hecho .p-t{ color:var(--bien); }
+
+/* Bandeja: cada documento leído */
+.doc-linea{
+  display:flex; align-items:center; gap:.7rem; padding:.42rem .7rem;
+  border-bottom:1px solid var(--linea); font-size:.86rem;
+}
+.doc-linea:last-child{ border-bottom:none; }
+.doc-linea .d-i{ font-size:.9rem; width:1.2rem; text-align:center; flex:none; }
+.doc-linea .d-n{ flex:1 1 auto; color:var(--tinta); min-width:0;
+                 overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.doc-linea .d-t{ color:var(--tinta-3); font-size:.78rem; flex:none; }
+.bandeja{ background:#fff; border:1px solid var(--borde);
+          border-radius:var(--radio); overflow:hidden; margin:.3rem 0 .8rem 0; }
+.bandeja-cab{ background:var(--plano); padding:.45rem .7rem; font-size:.72rem;
+              font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+              color:var(--tinta-3); border-bottom:1px solid var(--linea); }
+
+/* El aviso */
+.aviso{
+  border:1px solid var(--mal-borde); border-left:5px solid var(--mal-marca);
+  background:linear-gradient(180deg,var(--mal-fondo),#fff 65%);
+  border-radius:0 var(--radio) var(--radio) 0; padding:1.1rem 1.3rem;
+  margin:.4rem 0 1rem 0;
+}
+.aviso .a-e{ font-size:.7rem; font-weight:700; letter-spacing:.11em;
+             text-transform:uppercase; color:var(--mal); }
+.aviso .a-t{ font-size:1.4rem; font-weight:680; letter-spacing:-.02em;
+             color:var(--tinta); margin:.15rem 0 .35rem 0; line-height:1.25; }
+.aviso .a-d{ font-size:.92rem; color:var(--tinta-2); line-height:1.6; }
+.enfrentado{ display:flex; gap:.6rem; flex-wrap:wrap; margin:.8rem 0 .2rem 0; }
+.enfrentado > div{
+  flex:1 1 200px; background:#fff; border:1px solid var(--borde);
+  border-radius:var(--radio); padding:.7rem .85rem;
+}
+.enfrentado .e-q{ font-size:.7rem; font-weight:700; letter-spacing:.08em;
+                  text-transform:uppercase; color:var(--tinta-3); }
+.enfrentado .e-v{ font-size:1.7rem; font-weight:680; letter-spacing:-.02em;
+                  line-height:1.2; color:var(--tinta); }
+.enfrentado .e-f{ font-size:.75rem; color:var(--tinta-3); margin-top:.15rem;
+                  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.enfrentado .e--mal .e-v{ color:var(--mal); }
+
+/* Panel de herramientas */
+.herr{ display:flex; gap:.6rem; flex-wrap:wrap; margin:.4rem 0 .3rem 0; }
+.herr .h{
+  flex:1 1 210px; background:#fff; border:1px solid var(--borde);
+  border-radius:var(--radio); padding:.8rem .9rem; opacity:.55;
+}
+.herr .h--elegida{
+  opacity:1; border-color:var(--acento); border-top:3px solid var(--acento);
+  box-shadow:0 4px 16px rgba(37,99,235,.12);
+}
+.herr .h-e{ font-size:.66rem; font-weight:700; letter-spacing:.1em;
+            text-transform:uppercase; color:var(--acento-fuerte); }
+.herr .h-n{ font-size:1rem; font-weight:650; color:var(--tinta); margin:.1rem 0; }
+.herr .h-q{ font-size:.78rem; color:var(--tinta-3); }
+.herr .h-a{ font-size:.8rem; color:var(--tinta-2); margin-top:.35rem;
+            line-height:1.45; }
+
+/* La consulta final */
+.consulta{
+  background:#fff; border:1px solid var(--bien-borde);
+  border-left:5px solid var(--bien-marca);
+  border-radius:0 var(--radio) var(--radio) 0; padding:1rem 1.2rem;
+  margin:.4rem 0 .8rem 0;
+}
+.consulta .c-p{ font-size:.8rem; color:var(--tinta-3); }
+.consulta .c-v{ font-size:2rem; font-weight:680; letter-spacing:-.025em;
+                color:var(--bien); line-height:1.2; margin:.1rem 0 .1rem 0; }
+.consulta .c-m{ font-size:.87rem; color:var(--tinta-2); line-height:1.55; }
+.rastro{ font-size:.83rem; color:var(--tinta-2); line-height:1.7;
+         background:var(--plano); border-radius:var(--radio);
+         padding:.6rem .85rem; margin-top:.5rem; }
+.rastro b{ color:var(--tinta); }
+
 /* --- Esquema ------------------------------------------------------------ */
 .esquema{ width:100%; background:#fff; border:1px solid var(--borde);
           border-radius:var(--radio); padding:.5rem; overflow-x:auto; }
@@ -559,6 +810,20 @@ def _texto(t):
     return _NEGRITA.sub(r"<b>\1</b>", _e(t or ""))
 
 
+def _cifra(x):
+    """
+    30000 → «30.000». Una tirada sin separador no se lee, se descifra.
+
+    Sólo toca lo que es un entero limpio: si ya trae puntos o comas, se deja tal
+    cual, porque entonces alguien ya decidió cómo se escribe y no le corresponde
+    a la capa de pintura discutírselo.
+    """
+    t = str(x)
+    if not t.isdigit():
+        return t
+    return f"{int(t):,}".replace(",", ".")
+
+
 def linea_del_hilo(pasos, regla=None):
     """
     Las fases del hilo en una sola espina vertical.
@@ -644,6 +909,302 @@ def cabecera_fase(n, fase, titulo, responsable, estado="ejecutada"):
         f'<div class="fase-tit">{_e(titulo)}</div>'
         f'<div class="fase-quien">{_e(responsable)}</div></div></div>',
         unsafe_allow_html=True)
+
+
+CLASE_CAPA = {"IA": "n--ia", "Determinista": "n--det", "Humana": "n--hum"}
+
+
+def naturaleza(capas, glosa_estado=None, pie=True):
+    """
+    Qué capa resuelve esta pantalla: IA, reglas o persona.
+
+    La idea es de Fabián y su valor está en el detalle: una etiqueta apagada —en
+    discontinuo— significa «aquí iría, y hoy no está». Marcar como IA algo que
+    resuelve una expresión regular haría la demo más vendible y la conversación
+    más pobre, porque lo que él está intentando decidir es **dónde hace falta**.
+    """
+    if not capas:
+        return
+    trozos = []
+    for capa, estado, _que in capas:
+        apagada = estado != "actúa"
+        trozos.append(
+            f'<span class="n-e {CLASE_CAPA.get(capa, "n--det")}'
+            f'{" n--off" if apagada else ""}">{_e(capa)}'
+            + (f' · {_e(estado)}' if apagada else "") + '</span>')
+    st.markdown(f'<div class="nat">{"".join(trozos)}</div>',
+                unsafe_allow_html=True)
+    if pie:
+        lineas = [f'<b>{_e(c)}</b> — {_texto(q)}' for c, _e_, q in capas]
+        st.markdown(f'<div class="nat-pie">{"<br>".join(lineas)}</div>',
+                    unsafe_allow_html=True)
+
+
+def ficha_sesion(rol, nivel, area, empresa, permisos, actividad=None):
+    """
+    Quién eres, en cuanto entras.
+
+    «La aplicación sabe quién soy y qué puedo hacer» — la comprensión que Fabián
+    pide de esta pantalla. No se infiere de nada: sale de la ontología, y por eso
+    se puede enseñar el dato al lado del permiso.
+    """
+    campos = [("Empresa", empresa), ("Área", area), ("Nivel", nivel),
+              ("Permisos", permisos)]
+    if actividad:
+        campos.append(("Actividad reciente", actividad))
+    cuerpo = "".join(
+        f'<div><div class="s-e">{_e(k)}</div><div class="s-v">{_e(v)}</div></div>'
+        for k, v in campos if v)
+    st.markdown(
+        f'<div class="sesion"><div class="s-n">{_e(rol)}</div>'
+        f'<div class="s-r">Sesión iniciada · identidad y permisos leídos de la '
+        f'ontología de la empresa</div>'
+        f'<div class="sesion-campos">{cuerpo}</div></div>',
+        unsafe_allow_html=True)
+
+
+def _cita_html(fragmento):
+    """El trozo del documento con el valor resaltado dentro."""
+    if not fragmento:
+        return ('<div class="cita">— no se ha localizado el valor en el texto '
+                'del documento —</div>')
+    texto, forma = fragmento["texto"], fragmento["forma"]
+    escapado = _e(texto).replace(_e(forma), f"<b>{_e(forma)}</b>", 1)
+    return (f'<div class="cita">…{escapado}…</div>'
+            f'<div class="cita-pie">línea {_e(fragmento["linea"])} del '
+            f'documento</div>')
+
+
+def evidencia_enfrentada(lado_cliente, lado_orden):
+    """
+    Las dos afirmaciones, cada una con el fragmento literal que la sostiene.
+
+    Es lo que convierte una tabla en una evidencia. Un sistema que dice «la orden
+    pone 30.000» sin enseñar dónde lo pone está pidiendo que se le crea, y este
+    proyecto existe para que nadie tenga que creerse nada.
+    """
+    def caja(lado, clase, titulo):
+        if not lado:
+            return (f'<div class="{clase}"><div class="e-q">{_e(titulo)}</div>'
+                    f'<div class="e-d">sin documento que lo sostenga</div></div>')
+        e = lado[0]
+        return (f'<div class="{clase}"><div class="e-q">{_e(titulo)}</div>'
+                f'<div class="e-v">{_e(_cifra(e["valor"]))}</div>'
+                f'<div class="e-d">{_e(e["documento"])}</div>'
+                + _cita_html(e["fragmento"]) + '</div>')
+
+    st.markdown(
+        '<div class="evi">'
+        + caja(lado_cliente, "ev--cli", "Dice la documentación de cliente")
+        + caja(lado_orden, "ev--ord", "Dice la orden de fabricación")
+        + '</div>', unsafe_allow_html=True)
+
+
+def registro_criterio(reg):
+    """Las dos columnas del guion: qué se guarda y con qué condiciones aplica."""
+    ctx = reg.get("contexto") or {}
+    trazable = [
+        ("Patrón detectado", reg.get("etiqueta") or reg.get("campo")),
+        ("Diagnóstico", reg.get("diagnostico")),
+        ("Decisión", reg.get("decision")),
+        ("Justificación", reg.get("justificacion")),
+        ("Persona responsable", reg.get("validada_por")),
+        ("Propuesta por", reg.get("propuesta_por")),
+        ("Evidencias", ", ".join(reg.get("evidencias") or [])),
+        ("Fecha y versión",
+         f'{(reg.get("cuando") or "")[:10]} · v{reg.get("version")}'),
+    ]
+    reutil = [
+        ("Cliente", ctx.get("cliente")),
+        ("Producto", ctx.get("producto")),
+        ("Tipo de documento", ctx.get("tipo_documento")),
+        ("Tipo de incidencia", ctx.get("tipo_incidencia")),
+        ("Roles autorizados", ", ".join(reg.get("autorizados") or [])),
+    ]
+
+    def col(titulo, pares):
+        cuerpo = "".join(f'<dt>{_e(k)}</dt><dd>{_e(v)}</dd>'
+                         for k, v in pares if v)
+        return f'<div><div class="c-t">{_e(titulo)}</div><dl>{cuerpo}</dl></div>'
+
+    st.markdown('<div class="criterio">'
+                + col("Registro trazable", trazable)
+                + col("Contexto de reutilización", reutil)
+                + '</div>', unsafe_allow_html=True)
+
+
+def barra_consola(marca, estado, operario=None):
+    """
+    La barra de la consola, con el indicador de que el sistema está rodando.
+
+    El punto que late no es adorno: es la única forma de decir en una pantalla
+    quieta que **esto no está esperando a que pulses nada**. Quien llega, llega a
+    algo que lleva rato funcionando, y esa es la diferencia entre un producto y
+    una demostración.
+    """
+    quien = (f'<div class="c-op">Operario: <b>{_e(operario)}</b></div>'
+             if operario else
+             '<div class="c-op">Sin identificar</div>')
+    st.markdown(
+        f'<div class="consola-barra"><div class="c-marca">{_e(marca)}</div>'
+        f'<div class="vivo"><span class="punto"></span>{_e(estado)}</div>'
+        f'<div class="c-sep"></div>{quien}</div>', unsafe_allow_html=True)
+
+
+def tarjeta_alarma(prioridad, referencia, titulo, detalle):
+    st.markdown(
+        f'<div class="alarma"><div class="al-c">'
+        f'<div class="al-p">{_e(prioridad)}</div>'
+        f'<div class="al-r">{_e(referencia)}</div></div>'
+        f'<div class="al-t">{_e(titulo)}</div>'
+        f'<div class="al-d">{_texto(detalle)}</div></div>',
+        unsafe_allow_html=True)
+
+
+def contexto_del_operario(ctx):
+    """
+    Lo que la ontología dice de quien tiene la alarma delante.
+
+    Tres cajas: quién eres, a qué área afecta la alarma, y qué te deja hacer eso.
+    La tercera cambia de color, y es la que convierte el organigrama de Pablo en
+    algo que se nota al usar la aplicación en vez de un fichero que hay que
+    creerse.
+    """
+    if ctx["puede_validar"]:
+        clase, que, pie = ("x--puede", "Puedes cerrarla",
+                           "Tu puesto manda sobre el área afectada.")
+    elif ctx["puede_proponer"]:
+        clase, que, pie = ("x--no", "Puedes proponer",
+                           f'Cerrarla le corresponde a '
+                           f'{", ".join(ctx["manda"]) or "nadie declarado"}.')
+    else:
+        clase, que, pie = ("x--no", "No te corresponde",
+                           ctx["motivo"] or "Esta alarma no es de tu área.")
+    st.markdown(
+        f'<div class="ctx">'
+        f'<div><div class="x-e">Operario</div>'
+        f'<div class="x-v">{_e(ctx["rol"])}</div>'
+        f'<div class="x-n">nivel {_e(ctx["nivel"])} · {_e(ctx["area"])}</div></div>'
+        f'<div><div class="x-e">Afecta a</div>'
+        f'<div class="x-v">{_e(ctx["area_afectada"] or "área sin determinar")}</div>'
+        f'<div class="x-n">según la ontología de la empresa</div></div>'
+        f'<div class="{clase}"><div class="x-e">Permisos</div>'
+        f'<div class="x-v">{_e(que)}</div>'
+        f'<div class="x-n">{_e(pie)}</div></div></div>',
+        unsafe_allow_html=True)
+
+
+def precedente(sug):
+    """Lo que el sistema recuerda de casos iguales."""
+    u = sug["ultimo"]
+    veces = "una vez" if sug["casos"] == 1 else f'{sug["casos"]} veces'
+    st.markdown(
+        f'<div class="precedente"><div class="pr-e">El sistema recuerda</div>'
+        f'<div class="pr-t">Esto ya se resolvió {veces}</div>'
+        f'<div class="pr-d">La última, en el pedido <b>{_e(u["pedido"])}</b>: '
+        f'{_e(_cifra(u["valor_cliente"]))} contra '
+        f'{_e(_cifra(u["valor_orden"]))}, y '
+        f'<b>{_e(u["decision"])}</b> — lo validó {_e(u["validada_por"])}. '
+        f'{_texto(sug["motivo"])}</div></div>', unsafe_allow_html=True)
+
+
+def panel_memoria(res):
+    """Lo que el sistema ha aprendido, en crudo y auditable."""
+    if not res["decisiones"]:
+        nota("Todavía no hay ninguna decisión registrada. La memoria se llena "
+             "con lo que se vaya resolviendo, y a partir de ahí las alarmas "
+             "parecidas llegan con su precedente puesto.", tono="espera")
+        return
+    filas = "".join(
+        f'<div class="mem-fila"><div class="m-p">{_e(r["pedido"])}</div>'
+        f'<div class="m-q">{_e(r["etiqueta"] or r["campo"])}: '
+        f'{_e(_cifra(r["valor_cliente"]))} contra '
+        f'{_e(_cifra(r["valor_orden"]))} → '
+        f'<b>{_e(r["decision"])}</b></div>'
+        f'<div class="m-w">{_e(r["validada_por"])}</div></div>'
+        for r in res["ultimas"])
+    st.markdown(f'<div class="memoria">{filas}</div>', unsafe_allow_html=True)
+
+
+def barra_pasos(pasos, actual):
+    """Las seis pantallas del recorrido, con dónde estás."""
+    trozos = []
+    for i, (clave, nombre, pie) in enumerate(pasos, 1):
+        estado = ("aqui" if clave == actual else
+                  "hecho" if [p[0] for p in pasos].index(clave)
+                  < [p[0] for p in pasos].index(actual) else "")
+        trozos.append(f'<div class="p{" p--" + estado if estado else ""}">'
+                      f'<div class="p-n">{i} · {_e(nombre)}</div>'
+                      f'<div class="p-t">{_e(pie)}</div></div>')
+    st.markdown(f'<div class="pasos">{"".join(trozos)}</div>',
+                unsafe_allow_html=True)
+
+
+GLIFO_TIPO = {"orden": "▣", "pedido_cliente": "✉", "presupuesto": "€",
+              "desconocido": "?", "sin_texto": "⌀"}
+
+
+def bandeja(titulo, documentos, tipos):
+    """Los documentos de un pedido, leídos, con lo que se ha reconocido."""
+    filas = "".join(
+        f'<div class="doc-linea"><div class="d-i">'
+        f'{GLIFO_TIPO.get(d["tipo"], "·")}</div>'
+        f'<div class="d-n">{_e(d["nombre"])}</div>'
+        f'<div class="d-t">{_e(tipos.get(d["tipo"], d["tipo"]))}'
+        + (f' · {_e(d["paginas"])} pág.' if d.get("paginas") else "")
+        + '</div></div>' for d in documentos)
+    st.markdown(f'<div class="bandeja"><div class="bandeja-cab">{_e(titulo)}'
+                f'</div>{filas}</div>', unsafe_allow_html=True)
+
+
+def aviso_incidencia(titulo, detalle, etiqueta="Incidencia detectada"):
+    st.markdown(f'<div class="aviso"><div class="a-e">{_e(etiqueta)}</div>'
+                f'<div class="a-t">{_e(titulo)}</div>'
+                f'<div class="a-d">{_texto(detalle)}</div></div>',
+                unsafe_allow_html=True)
+
+
+def enfrentar(izq, der):
+    """Dos cifras cara a cara: lo que se pidió contra lo que se iba a hacer."""
+    def caja(x, mal=False):
+        return (f'<div class="{"e--mal" if mal else ""}">'
+                f'<div class="e-q">{_e(x["que"])}</div>'
+                f'<div class="e-v">{_e(x["valor"])}</div>'
+                f'<div class="e-f">{_e(x.get("fuente", ""))}</div></div>')
+    st.markdown(f'<div class="enfrentado">{caja(izq)}{caja(der, True)}</div>',
+                unsafe_allow_html=True)
+
+
+def rejilla_herramientas(herramientas, elegida_id):
+    """
+    Las herramientas del equipo, con la que el sistema ha elegido en primer plano.
+
+    Las demás no se ocultan: verlas apagadas es lo que hace entender que había
+    dónde elegir y que la elección la ha hecho el sistema, no quien mira.
+    """
+    trozos = []
+    for h in herramientas:
+        elegida = h["id"] == elegida_id
+        trozos.append(
+            f'<div class="h{" h--elegida" if elegida else ""}">'
+            + (f'<div class="h-e">Le corresponde</div>' if elegida else
+               '<div class="h-e" style="color:var(--tinta-3)">No aplica aquí</div>')
+            + f'<div class="h-n">{_e(h["nombre"])}</div>'
+              f'<div class="h-q">{_e(h["responsable"])}</div>'
+              f'<div class="h-a">{_e(h["atiende"])}</div></div>')
+    st.markdown(f'<div class="herr">{"".join(trozos)}</div>',
+                unsafe_allow_html=True)
+
+
+def consulta_pedido(campo, valor, mensaje, rastro=None):
+    """Cómo responde el sistema cuando se le vuelve a preguntar por el pedido."""
+    pie = ""
+    if rastro:
+        pie = f'<div class="rastro">{"<br>".join(_texto(r) for r in rastro)}</div>'
+    st.markdown(f'<div class="consulta"><div class="c-p">{_e(campo)}</div>'
+                f'<div class="c-v">{_e(valor)}</div>'
+                f'<div class="c-m">{_texto(mensaje)}</div>{pie}</div>',
+                unsafe_allow_html=True)
 
 
 def mapa_organizativo(onto, clave, categoria=None, autoridad=None):

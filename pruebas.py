@@ -2892,38 +2892,265 @@ comprobar("evidencia" in _CASO.REGLA and "autoridad" in _CASO.REGLA
 # arranca el usuario —dos ficheros— y recorre clasificación, lectura, extracción
 # y las cuatro fases. Si algún día se rompe la lectura de la orden, el recorrido
 # se quedaría sin discrepancia y esta comprobación es la que lo dice.
+# --- Y ahora lo mismo, pero partiendo de la bandeja de PDF ------------------
+# Todo lo de arriba parte de diccionarios escritos aquí. Esto arranca donde
+# arranca el usuario —una carpeta con documentos— y recorre agrupación,
+# clasificación, lectura, extracción y encaminado. Si algún día se rompe la
+# lectura de la orden, la bandeja se quedaría sin incidencia y esta comprobación
+# es la que lo dice.
+from demo import flujo as _FLU
+
 _EJEMPLO = guion.documentos_de("ejemplo")
 if _EJEMPLO:
     from nucleo import clasificacion as _CL
     _docs_ej, _ = _CL.anotar_tipos(_EJEMPLO, A.clasificar,
                                    A.TIPOS, "determinista", permiso=None)
     _tipos_ej = {_CL.tipo_de(d, A.clasificar) for d in _docs_ej}
-    comprobar(_tipos_ej == {"orden", "pedido_cliente"},
-              "Los dos documentos de ejemplo se identifican por su contenido: "
-              "una orden de fabricación y un pedido de cliente",
+    comprobar(_tipos_ej == {"orden", "pedido_cliente", "presupuesto"},
+              "Los documentos de la bandeja se identifican por su contenido: "
+              "orden de fabricación, pedido de cliente y presupuesto",
               str(sorted(_tipos_ej)))
 
-    _esp_ej, _ctx_ej = A.verdad_de_campo(_docs_ej, "determinista")
-    _cant = next((e for e in _esp_ej if e["campo"] == "cantidad"), None)
-    comprobar(_cant is not None
+    from demo import consola as _CON_S
+    _est_ej = _CON_S.arrancar(_docs_ej, A.clasificar)
+    comprobar(len(_est_ej["contratos"]) == 1,
+              "El contrato marco se aparta de los pedidos porque es el único "
+              "documento que se puede situar en el tiempo — y ese criterio lo "
+              "pone el módulo de vigencia, que es de quien es la pregunta",
+              str(len(_est_ej["contratos"])))
+    comprobar(_est_ej["pedidos"] == 3,
+              "…y los nueve documentos restantes se reparten solos en tres "
+              "pedidos, agrupando por ISBN y no por el nombre del fichero",
+              str(_est_ej["pedidos"]))
+    comprobar(len(_est_ej["limpios"]) == 1 and len(_est_ej["alarmas"]) == 2,
+              "El sistema DISTINGUE: despacha un pedido sin molestar a nadie y "
+              "levanta alarma en los otros dos. Una alarma que saltara en todo "
+              "lo que mira no demostraría nada",
+              f'{len(_est_ej["limpios"])} limpios, {len(_est_ej["alarmas"])} alarmas')
+    comprobar(all(a["etiqueta"].startswith("O.F.") for a in _est_ej["alarmas"]),
+              "Cada pedido se nombra por su número de orden, sacado de la propia "
+              "orden de fabricación: «pedido 9780000000024» no lo entiende nadie")
+
+    _res_ej = _est_ej["resultados"]
+    _inc_ej = _FLU.primera_incidencia(_res_ej)
+    _cant = _inc_ej["principal"]
+    comprobar(_cant["campo"] == "cantidad"
               and str(_cant["valor_cliente"]) == "3000"
               and str(_cant["valor_orden"]) == "30000",
               "La discrepancia sale de leer los PDF, no de un diccionario "
               "escrito a mano: 3.000 pedidos contra 30.000 en la orden",
               str(_cant))
-    comprobar(_CASO.numero_de_pedido(_ctx_ej) is None,
-              "Y cuando el nombre del documento no lleva número de pedido, no se "
-              "inventa uno: pedirle a Mencía «la exportación del pedido "
-              "EJEMPLO_orden_de_fabricacion» sería una petición inatendible")
-    comprobar(_CASO.numero_de_pedido({"pedido": "of42805"}) == "42805",
-              "…y cuando sí lo lleva, lo saca: `of42805` → 42805")
+    comprobar(_cant["severidad_esperada"] != _inc_ej["discrepancias"][-1]
+              ["severidad_esperada"],
+              "…y de las dos que hay, el recorrido lo conduce la más grave, no "
+              "la primera que aparece")
 
-    _obs_ej = _CASO.observar(_esp_ej,
-                             A.interpretar(A.EJEMPLO)[0])
+    _h, _motivo = _FLU.encaminar(_inc_ej)
+    comprobar(_h["id"] == "auditoria" and "orden de fabricación" in _motivo,
+              "El sistema encamina solo la incidencia a la herramienta que le "
+              "toca, y dice por qué. Quien recibe el aviso no tiene por qué "
+              "saber cuál de las cinco le corresponde")
+
+    _imp = _FLU.impacto(_cant)
+    comprobar(_imp["exceso"] == 27000 and _imp["veces"] == 10.0,
+              "El aviso trae el tamaño del problema: 27.000 ejemplares de más, "
+              "diez veces lo pedido")
+    comprobar("coste" not in _FLU.impacto(_cant),
+              "Y NO trae euros: el coste unitario no se lo inventa el sistema. "
+              "Una cifra sacada de la nada convierte una demostración en un "
+              "folleto")
+    comprobar(_FLU.impacto(_cant, 2.5)["coste"] == 67500.0,
+              "…pero si alguien lo aporta, lo calcula")
+
+    _limpio = _est_ej["limpios"][0]
+    comprobar(not _limpio["discrepancias"],
+              "Del pedido que cuadra no se emite nada: no hay falsos positivos "
+              "que despachar")
+
+    _obs_ej = _CASO.observar(_inc_ej["discrepancias"], A.interpretar(A.EJEMPLO)[0])
     comprobar(_obs_ej["principal"]["campo"] == "cantidad"
               and not _obs_ej["inventadas"],
               "Contrastada con la respuesta real del módulo de Juan, la "
-              "discrepancia que conduce el caso es la cantidad")
+              "discrepancia que conduce el caso es la cantidad y el módulo no "
+              "reporta nada que los documentos no sostengan")
+
+    # El recorrido de seis pantallas
+    comprobar([p[0] for p in _FLU.PASOS]
+              == ["bandeja", "aviso", "panel", "herramienta", "validacion",
+                  "cierre"],
+              "El recorrido de la demo son seis pantallas en un orden fijo: de la "
+              "bandeja a la decisión guardada")
+    comprobar(_FLU.siguiente("bandeja") == "aviso"
+              and _FLU.siguiente("cierre") == "cierre",
+              "…y no se sale por el final: el último paso no avanza a ninguna "
+              "parte")
+    comprobar({h["id"] for h in _FLU.HERRAMIENTAS}
+              >= {"auditoria", "vigencia", "similitud", "contradicciones"},
+              "El panel enseña las herramientas del equipo, no sólo la que toca: "
+              "ver las demás apagadas es lo que hace entender que había dónde "
+              "elegir")
+
+    # Una bandeja sin la orden no produce un aviso falso.
+    _sin_orden = [d for d in _docs_ej
+                  if _CL.tipo_de(d, A.clasificar) != "orden"
+                  and "contrato" not in (d.get("nombre") or "")]
+    _res_parcial = _FLU.procesar(_sin_orden, A.clasificar)
+    comprobar(all(r["estado"] == "incompleto" for r in _res_parcial)
+              and all(r["motivo"] for r in _res_parcial),
+              "Sin la orden de fabricación no se emite ninguna incidencia: se "
+              "declara que falta documentación y se dice cuál. «No puedo "
+              "comprobarlo» no es «está bien»")
+    comprobar(_FLU.primera_incidencia(_res_parcial) is None,
+              "…y por tanto el recorrido no arranca sobre datos incompletos")
+
+    # --- La consola: permisos, actuación y memoria ------------------------
+    from nucleo import memoria as _MEM
+    import tempfile as _tmp
+    _ruta_mem = _Path(_tmp.mkdtemp()) / "memoria.json"
+
+    _al = _est_ej["alarmas"][0]
+    _ctx_bajo = _CON_S.contexto_operario("Encargados de Turno", _al)
+    _ctx_alto = _CON_S.contexto_operario("Dir. Producción", _al)
+    _ctx_ajeno = _CON_S.contexto_operario("Admin. Financieros", _al)
+    comprobar(_ctx_bajo["puede_proponer"] and not _ctx_bajo["puede_validar"]
+              and _ctx_alto["puede_validar"]
+              and not _ctx_ajeno["puede_proponer"],
+              "La app determina qué puede hacer el operario A PARTIR de la "
+              "alarma que tiene delante: la misma persona puede cerrar una y no "
+              "poder tocar otra")
+    comprobar(_CON_S.acciones_para(_ctx_ajeno) == ["escalar"],
+              "A quien no le corresponde no se le enseñan botones apagados: se "
+              "le enseña el único que tiene sentido")
+    comprobar("escalar" in _CON_S.acciones_para(_ctx_bajo)
+              and "escalar" not in _CON_S.acciones_para(_ctx_alto),
+              "…y quien puede cerrar no tiene a quién escalar")
+
+    comprobar(_CON_S.actuar(_al, "aceptar", _ctx_alto)
+              .get("falta_justificacion") is True,
+              "Sin justificación no se registra nada, ni siquiera para quien "
+              "puede cerrar: una decisión sin motivo no se puede reutilizar "
+              "como criterio")
+    comprobar(_CON_S.actuar(_al, "aceptar", _ctx_bajo)
+              .get("falta_justificacion") is True,
+              "…y la exigencia va ANTES que los permisos, porque el guion dice "
+              "«el encargado propone Y JUSTIFICA»: una propuesta sin motivo le "
+              "deja al que valida el mismo trabajo que si no la hubiera")
+
+    _r_bajo = _CON_S.actuar(_al, "aceptar", _ctx_bajo,
+                            justificacion="Pedido y presupuesto coinciden.")
+    comprobar(_r_bajo["cerrada"] is False
+              and _r_bajo["propuesta_por"] == "Encargados de Turno",
+              "El mando operativo revisa la alarma y NO se cierra: queda "
+              "constancia de quién la miró, y el conflicto sigue vivo")
+    comprobar(bool(_r_bajo.get("justificacion")),
+              "…y su justificación viaja con la propuesta, para que quien "
+              "valide vea por qué se propuso eso")
+
+    # La evidencia: fragmentos exactos y diagnóstico.
+    _diag = _CON_S.diagnostico(_al)
+    comprobar(_diag["clave"] == "error_probable",
+              "Con el pedido y el presupuesto diciendo lo mismo y sólo la orden "
+              "apartándose, el diagnóstico es «error probable» — y sale de "
+              "comparar los documentos de cliente entre sí, no de una opinión",
+              _diag["clave"])
+    comprobar(all(e["fragmento"] for e in _diag["apoyan_cliente"])
+              and all(e["fragmento"] for e in _diag["apoyan_orden"]),
+              "Cada afirmación trae el fragmento LITERAL del documento donde "
+              "aparece: un sistema que dice «la orden pone 30.000» sin enseñar "
+              "dónde lo pone está pidiendo que se le crea")
+    comprobar(_diag["apoyan_cliente"][0]["tipo"] == "pedido_cliente",
+              "…y la cita principal es la del pedido de cliente, no la del "
+              "presupuesto: es el documento con el que el cliente encarga")
+    comprobar(_CON_S.fragmento_de("Cantidad: 30.000 unidades", 30000)["forma"]
+              == "30.000",
+              "El fragmento se busca en las formas en que un número puede estar "
+              "escrito, porque el documento no tiene por qué escribirlo como lo "
+              "normalizó el extractor")
+    comprobar(_CON_S.fragmento_de("aquí no está", 999) is None,
+              "Y si no se encuentra se devuelve None: no encontrarlo es un dato, "
+              "y aguas abajo se convierte en «evidencia insuficiente» en vez de "
+              "en una cita inventada")
+
+    # La naturaleza de cada pantalla.
+    from demo import naturaleza as _NAT
+    _res_nat = _NAT.resumen()
+    comprobar(_res_nat["pantallas"] == 9,
+              "Las nueve pantallas del guion de Fabián declaran qué capa las "
+              "resuelve")
+    comprobar(_res_nat["por_capa"][_NAT.IA] == 0
+              and _res_nat["por_capa"][_NAT.DETERMINISTA] == 9,
+              "Y el dato honesto: HOY las nueve las resuelven reglas, ninguna "
+              "la IA. Marcar como IA algo que resuelve una expresión regular "
+              "haría la demo más vendible y la conversación más pobre",
+              str(_res_nat["por_capa"]))
+    comprobar(_res_nat["ia_prevista"] >= 3,
+              "…y se declara dónde SÍ aportaría, que es lo que Fabián está "
+              "intentando decidir")
+    comprobar(all(c in (_NAT.IA, _NAT.DETERMINISTA, _NAT.HUMANA)
+                  and e in (_NAT.ACTUA, _NAT.DISPONIBLE, _NAT.PREVISTA)
+                  for f in _NAT.PANTALLAS.values() for c, e, _ in f["capas"]),
+              "Ninguna pantalla se inventa una capa ni un estado")
+
+    # La memoria, sobre un fichero de usar y tirar.
+    comprobar(_MEM.precedentes(_al["principal"], _ruta_mem,
+                               excepto=_al["etiqueta"]) == [],
+              "Un caso no se sienta precedente a sí mismo: al cerrar una alarma "
+              "su propio registro no vuelve como «esto ya pasó»")
+    _MEM.olvidar(_ruta_mem)
+    comprobar(_MEM.sugerencia(_al["principal"], _ruta_mem) is None,
+              "Sin decisiones previas no hay precedente que ofrecer, y el "
+              "sistema no se inventa uno")
+    _MEM.registrar(_al["principal"], "aceptar", "Dir. Producción",
+                   _al["etiqueta"], propuesta_por="Encargados de Turno",
+                   ruta=_ruta_mem)
+    _al2 = _est_ej["alarmas"][1]
+    _sug = _MEM.sugerencia(_al2["principal"], _ruta_mem)
+    comprobar(_sug and _sug["casos"] == 1 and _sug["decision"] == "aceptar",
+              "Resuelta una alarma, la SIGUIENTE de la misma clase llega con su "
+              "precedente puesto: 3.000 contra 30.000 y 800 contra 8.000 son el "
+              "mismo problema aunque no sean los mismos números")
+    comprobar(_MEM.clase_de(_al["principal"]) == _MEM.clase_de(_al2["principal"]),
+              "…porque lo que se recuerda es la FORMA del error —qué campo y en "
+              "qué dirección— y no los valores concretos, que no se repiten nunca")
+    comprobar(_sug["ofrecer"] is False,
+              "Con un solo precedente se enseña pero no se ofrece aplicarlo: una "
+              "sola vez es una anécdota")
+    _MEM.registrar(_al2["principal"], "aceptar", "Dir. Producción", "otro",
+                   ruta=_ruta_mem)
+    comprobar(_MEM.sugerencia(_al["principal"], _ruta_mem)["ofrecer"] is True,
+              "Con dos coincidentes sí se ofrece como atajo — y aun así hay que "
+              "pulsarlo: quien responde de la decisión sigue siendo la persona")
+    _MEM.registrar(_al2["principal"], "corregir", "Dir. Producción", "otro2",
+                   ruta=_ruta_mem)
+    _desacuerdo = _MEM.sugerencia(_al["principal"], _ruta_mem)
+    comprobar(_desacuerdo["ofrecer"] is False
+              and len(_desacuerdo["reparto"]) == 2,
+              "Y si las veces anteriores se resolvió de formas distintas, el "
+              "sistema lo enseña y NO elige: recordar no le da derecho a "
+              "resolver un desacuerdo entre dos decisiones humanas")
+    _MEM.olvidar(_ruta_mem)
+
+    # Las tres herramientas de análisis
+    _dil = _CON_S.analisis_diligencia(_est_ej["contratos"], date(2026, 9, 7))
+    comprobar(_dil["aplica"] and _dil["documentos"][0]["estado"] == "vigente"
+              and _dil["documentos"][0]["preaviso"] == 60,
+              "La herramienta de diligencia lee el contrato de verdad: vigente, "
+              "con su plazo y su preaviso de 60 días",
+              str(_dil["documentos"][0]["estado"]))
+    comprobar(_CON_S.analisis_diligencia([])["aplica"] is False,
+              "…y sin documentación contractual lo dice, en vez de enseñar un "
+              "panel vacío")
+    _sim = _CON_S.analisis_similitud()
+    comprobar(_sim["aplica"] is False and "otro dominio" in _sim["motivo"],
+              "La de similitud declara que su histórico es de otro dominio y NO "
+              "contesta sobre este pedido. Disfrazar la salida de un dominio "
+              "como si fuera del otro es justo lo que este proyecto detecta")
+
+comprobar(_CASO.numero_de_pedido({"pedido": "of42805"}) == "42805",
+          "El número de pedido se saca del nombre del documento: `of42805` → 42805")
+comprobar(_CASO.numero_de_pedido({"pedido": "sin_numero"}) is None,
+          "…y cuando no lo lleva no se inventa uno: pedir «la exportación del "
+          "pedido sin_numero» sería una petición inatendible")
 
 print("\n36 · Proponer no es validar: los dos escalones de la cadena")
 # La regla la confirmó Íñigo mirando el vídeo del módulo: hay que estar en el

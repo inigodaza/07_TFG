@@ -4,15 +4,25 @@ Bloque de Evaluación y Calidad — TFG Íñigo Daza.
 Esta capa sólo elige qué rama se ejecuta y pinta lo que devuelve. Toda la
 evaluación vive en `nucleo/` y `modulos/`: la app es un selector.
 
-Tres pantallas:
-  · Evaluar un módulo — la rejilla de módulos y el flujo de tres pasos
-  · Demo              — el recorrido completo, módulo a módulo
+Tres pantallas, y la primera es de otra clase que las otras dos:
+
+  · Demo              — cómo funcionaría la APLICACIÓN: entran documentos por un
+                        lado y sale por el otro una decisión con autor y rastro
+  · Evaluar un módulo — este BLOQUE haciendo su trabajo: baterías, métricas,
+                        severidad, veredicto e informe
   · Esquema           — por dónde circula un dato y qué hace cada módulo
+
+La separación es deliberada. La demo enseña el producto que el equipo
+construiría con las cinco piezas juntas; la evaluación enseña qué se sostiene
+hoy con datos reales. Mezclarlas produciría una demostración bonita que no
+distingue lo que funciona de lo que se ha ensayado, que es exactamente lo que
+este proyecto le reprocha a los módulos que evalúa.
 """
 
 import html
 import json
 import tempfile
+import time
 from datetime import date
 
 import pandas as pd
@@ -58,10 +68,10 @@ if _sin_subir:
 import esquema
 import modulos
 import ui
-from demo import caso, guion, sesion
+from demo import caso, consola, flujo, guion, naturaleza, sesion
 from modulos import auditoria, contradicciones, similitud, vigencia
 from nucleo import VERSION
-from nucleo import asesor, autoridad, clasificacion, historial, llm, plantilla
+from nucleo import asesor, autoridad, clasificacion, historial, llm, memoria, plantilla
 from nucleo import bateria as B_NUCLEO
 from nucleo import pdf as P
 from nucleo import veredicto as V
@@ -97,7 +107,14 @@ PIEZAS = [
                    "tabla_documentos:extraer", "panel_contradicciones",
                    "panel_cambios", "linea_del_hilo", "cabecera_fase",
                    "lecturas_de_campo", "mapa_organizativo",
-                   "sesion_iniciada", "cadena_de_custodia"]),
+                   "sesion_iniciada", "cadena_de_custodia", "barra_pasos",
+                   "bandeja", "aviso_incidencia", "enfrentar",
+                   "rejilla_herramientas", "consulta_pedido",
+                   "barra_consola", "tarjeta_alarma", "naturaleza",
+                   "ficha_sesion", "evidencia_enfrentada",
+                   "registro_criterio",
+                   "contexto_del_operario", "precedente",
+                   "panel_memoria"]),
     ("nucleo/bateria.py", B_NUCLEO, ["SEVERIDADES", "ORDEN_SEVERIDAD"]),
     ("nucleo/plantilla.py", plantilla, ["filas", "a_markdown", "severidad_de"]),
     ("nucleo/asesor.py", asesor, ["aconsejar", "verificar_anclaje"]),
@@ -112,6 +129,23 @@ PIEZAS = [
                             "numero_de_pedido", "LECTURAS_DE_CAMPO", "REGLA"]),
     ("demo/sesion.py", sesion, ["entrar", "resumen", "nueva",
                                 "PROPUESTA", "VALIDADA"]),
+    ("demo/naturaleza.py", naturaleza, ["PANTALLAS", "capas_de",
+                                        "resumen", "ACTUA"]),
+    ("demo/consola.py", consola, ["arrancar", "contexto_operario",
+                                  "acciones_para", "actuar",
+                                  "analisis_incongruencias",
+                                  "analisis_diligencia",
+                                  "analisis_similitud", "ANALISIS",
+                                  "diagnostico", "fragmento_de",
+                                  "contexto_del_caso"]),
+    ("nucleo/memoria.py", memoria, ["registrar", "precedentes",
+                                    "sugerencia", "resumen",
+                                    "olvidar", "clase_de",
+                                    "aplica_a",
+                                    "registrar:justificacion"]),
+    ("demo/flujo.py", flujo, ["procesar", "primera_incidencia",
+                              "encaminar", "impacto", "agrupar",
+                              "PASOS", "HERRAMIENTAS"]),
     ("nucleo/autoridad.py", autoridad,
      ["tiene_autoridad", "quien_manda_sobre", "cargar", "confirmada",
       "categorias_confirmadas", "puede", "pertenece_al_area", "area_de"]),
@@ -233,7 +267,7 @@ elif "spa" not in P.idiomas_ocr():
 # veces —una con un texto escrito a mano y otra módulo a módulo— y ninguna de las
 # dos dejaba meter un caso y verlo recorrer el sistema. Ahora es una sola y se
 # ejecuta con los documentos que le pongas delante.
-PANTALLAS = ["Seguir un caso", "Evaluar un módulo", "Esquema del sistema"]
+PANTALLAS = ["Consola", "Evaluar un módulo", "Esquema del sistema"]
 
 with st.sidebar:
     st.markdown('<div class="eyebrow">TFG · Íñigo Daza</div>'
@@ -295,336 +329,498 @@ ICONO = {"ejecutado": ("p-bien", "✓", "Ejecutado"),
          "no_operativo": ("p-espera", "◌", "No operativo")}
 
 
-def pantalla_caso():
+def _miles(x):
     """
-    Un caso, de la discrepancia a la decisión, ejecutándose.
+    3000 → «3.000». Las cantidades de una tirada se leen con separador.
 
-    Antes esto eran dos pantallas. «El hilo» contaba el recorrido con un texto
-    escrito a mano —decía lo mismo con datos que sin ellos— y «Demo» ejecutaba
-    las baterías módulo a módulo, cada una por su lado, de modo que no se veía
-    que fueran partes del mismo caso. Son la misma cosa contada dos veces y mal
-    las dos.
-
-    Ahora es una sola: entran la orden de fabricación y el pedido de cliente, y
-    de ahí sale todo. La discrepancia la deduce el evaluador leyendo los PDF; la
-    respuesta del módulo de Juan se pega y se contrasta; la autoridad sale de la
-    matriz de Pablo; la decisión, de la exportación de Mencía. Ninguna fase
-    escribe un resultado a mano y ninguna finge tener datos que no tiene.
+    Ojo con el punto: aquí llegan dos cosas distintas. De los documentos llegan
+    cadenas donde el punto son los miles («30.000») y del cálculo del impacto
+    llegan números donde el punto es el decimal (27000.0). Quitar los puntos a
+    ciegas convertía 27000.0 en 270.000 — un cero de más contando ceros de más,
+    que es la errata más embarazosa posible en esta pantalla.
     """
-    ficha_j = auditoria.FICHA
-    st.markdown(
-        '<div class="hero"><div class="eyebrow">Un hecho, cuatro manos</div>'
-        '<h1>Seguir un caso de la discrepancia a la decisión</h1>'
-        '<div class="meta">Mete la orden de fabricación y el pedido de cliente. '
-        'A partir de ahí el recorrido se ejecuta: qué discrepancia hay, si el '
-        'módulo de Juan la vio, de quién es la decisión según la matriz de '
-        'Pablo, quién la validó según el módulo de Mencía y si todo eso se '
-        'sostiene.</div></div>', unsafe_allow_html=True)
-
-    # ---------------------------------------------------------------- 0 · datos
-    docs = subir_documentos(ficha_j, "caso", carpeta_demo=["auditoria", "ejemplo"])
-
-    docs, avisos_tipo = clasificacion.anotar_tipos(
-        docs, auditoria.clasificar, auditoria.TIPOS, "determinista",
-        permiso=llm.permiso_de(ficha_j))
-    for _a in avisos_tipo:
-        st.info(_a)
-
+    if isinstance(x, (int, float)):
+        return f"{int(round(x)):,}".replace(",", ".")
     try:
-        esperados, contexto = auditoria.verdad_de_campo(docs, "determinista")
-    except ValueError as e:
-        st.error(str(e))
-        st.stop()
+        return f"{int(float(str(x).replace('.', '').replace(',', '.'))):,}".replace(",", ".")
+    except (TypeError, ValueError):
+        return str(x)
 
-    pedido = caso.numero_de_pedido(contexto)
 
-    # ------------------------------------------------------- 1 · OBSERVAR
-    ui.cabecera_fase(1, "Observar", "¿Qué no cuadra en este pedido?",
-                     "Juan Salas · módulo de auditoría documental")
+def _consola_docs():
+    """La bandeja: la de ejemplo, o la que se suba."""
+    # En la barra lateral, no en la pantalla: de dónde salen los documentos es
+    # configuración, y en un producto la configuración no ocupa el primer sitio
+    # que ve el operario.
+    with st.sidebar:
+        st.markdown("---")
+        st.markdown("**Origen de los documentos**")
+        fuente = st.radio(
+            "Origen", ["Bandeja de ejemplo", "Subir los míos"],
+            horizontal=True, label_visibility="collapsed", key="consola_fuente")
+        if fuente == "Bandeja de ejemplo":
+            st.caption("Tres pedidos y un contrato marco, inventados de "
+                       "principio a fin y marcados como tales. Uno de los "
+                       "pedidos cuadra y dos no, y los dos que no llevan el "
+                       "mismo error: es lo que permite ver la memoria "
+                       "funcionando.")
+            docs = guion.documentos_de("ejemplo")
+            if not docs:
+                st.error("No hay documentos de ejemplo. Genéralos con "
+                         "`python demo/generar_ejemplo.py`.")
+                st.stop()
+            return docs
 
-    if not esperados:
-        st.success("El evaluador ha leído los dos documentos y **no encuentra "
-                   "ninguna discrepancia** entre ellos. Sin discrepancia no hay "
-                   "caso que seguir: el recorrido se queda aquí, y eso es un "
-                   "resultado, no un fallo.")
-        st.stop()
+        subidos = st.file_uploader(
+            "Documentos en PDF", type=["pdf", "txt"],
+            accept_multiple_files=True, key="consola_up")
+        if not subidos:
+            st.info("Sube órdenes de fabricación, documentación de cliente y, "
+                    "si los hay, contratos. El sistema los reparte solo.")
+            st.stop()
+        firmas = tuple((f.name, hash(f.getvalue())) for f in subidos)
+        memo = st.session_state.setdefault("_consola_leidos", {})
+        if firmas not in memo:
+            with st.spinner("Leyendo…"):
+                with tempfile.TemporaryDirectory() as tmp:
+                    memo.clear()
+                    memo[firmas] = P.leer_subidos(subidos, tmp, ocr=P.hay_ocr())
+        return [d for d in memo[firmas] if not d.get("huerfano")]
 
-    st.markdown("**Lo que ha encontrado el evaluador por su cuenta**")
-    st.caption("Esta mitad no depende de nadie: son los dos PDF leídos y "
-               "comparados campo a campo. Es la verdad de campo contra la que se "
-               "contrastará todo lo demás.")
-    st.dataframe(pd.DataFrame([{
-        "Campo": e["etiqueta"],
-        "Dice el cliente": e["valor_cliente"],
-        "Dice la orden": e["valor_orden"],
-        "Gravedad si se propaga": e["severidad_esperada"],
-    } for e in esperados]), use_container_width=True, hide_index=True)
 
-    st.markdown("**La respuesta del módulo de Juan**")
-    st.caption(ficha_j["entrada_respuesta"])
-    if "resp_caso" not in st.session_state:
-        st.session_state.resp_caso = ""
-    b1, b2 = st.columns([1, 3])
-    if b1.button("Pegar la respuesta del 42805", use_container_width=True,
-                 key="btn_ej_caso"):
-        st.session_state.resp_caso = auditoria.EJEMPLO
-    b2.caption("Atajo para la demostración: carga la respuesta que el módulo "
-               "emitió sobre el pedido 42805.")
-    respuesta = st.text_area("Respuesta del módulo", key="resp_caso", height=170,
-                             label_visibility="collapsed")
-    reportados, avisos = auditoria.interpretar(respuesta, "determinista")
-    for a in avisos:
-        st.warning(a)
+def _herramientas(alarma, estado):
+    """Las tres herramientas de análisis del esquema, cada una haciendo algo."""
+    st.markdown("#### Herramientas de análisis")
+    st.caption("Las del equipo, disponibles sobre esta alarma. Cada una responde "
+               "una pregunta distinta, y la que no puede responder lo dice.")
 
-    obs = caso.observar(esperados, reportados)
-    principal = obs["principal"]
+    a1, a2, a3 = consola.ANALISIS
 
-    ui.fila_kpis([
-        ui.kpi("Dice el cliente", str(principal["valor_cliente"]),
-               principal["etiqueta"].lower()),
-        ui.kpi("Dice la orden", str(principal["valor_orden"]),
-               "lo que se iba a fabricar", acento=True),
-        ui.kpi("Vistas por el módulo", f'{len(obs["vistas"])}/'
-               f'{len(obs["discrepancias"])}',
-               "discrepancias reales que Juan reporta"),
-    ])
-    if obs["no_vistas"]:
-        st.warning("**No las reporta:** "
-                   + ", ".join(e["etiqueta"] for e in obs["no_vistas"])
-                   + ". Existen en los documentos y el módulo no las menciona.")
-    if obs["inventadas"]:
-        st.error("**Reporta lo que el evaluador no encuentra:** "
-                 + ", ".join(str(r.get("campo")) for r in obs["inventadas"])
-                 + ". Puede ser un acierto suyo o un falso positivo; en cualquier "
-                   "caso no se sostiene sobre estos dos documentos.")
-    if not obs["no_vistas"] and not obs["inventadas"]:
-        st.success(f"El módulo reporta exactamente las discrepancias que "
-                   f"sostienen los documentos. El caso sigue con "
-                   f"**{principal['etiqueta'].lower()}**, la más grave.")
+    # 1 · Incongruencias — la herramienta que le corresponde a esta alarma.
+    #     Es la pantalla 5 del guion: evidencia y diagnóstico.
+    with st.expander(f"{a1['nombre']} — {a1['pregunta']}", expanded=True):
+        st.caption(a1["modulo"])
+        ui.naturaleza(naturaleza.capas_de("evidencia"))
 
-    # ------------------------------------------------------- 2 · GOBERNAR
-    gob = caso.gobernar(principal)
-    ui.cabecera_fase(2, "Gobernar", "¿De quién es esta decisión?",
-                     "Pablo Morillas · ontología de validación",
-                     "ejecutada" if gob.get("acuerdo") else
-                     "parcial" if gob.get("disponible") else "pendiente")
+        diag = consola.diagnostico(alarma)
+        ui.evidencia_enfrentada(diag["apoyan_cliente"], diag["apoyan_orden"])
+        pastilla = ("p-mal" if diag["clave"] == "error_probable" else
+                    "p-espera" if diag["clave"] != "cambio_documentado"
+                    else "p-acento")
+        st.markdown(
+            ui.pastilla(diag["etiqueta"], pastilla, "◆")
+            + f'&nbsp;&nbsp;<span style="font-size:.87rem;color:var(--tinta-2)">'
+              f'{html.escape(diag["por_que"])}</span>', unsafe_allow_html=True)
+        st.caption(f'Y en cualquier caso: {diag["y_ademas"][1]}')
 
-    if not gob.get("disponible"):
-        ui.nota(f'<b>{gob["motivo"]}</b>'
-                + (f' Falta {gob["requiere"]}.' if gob.get("requiere") else ""),
-                tono="espera")
-    else:
-        st.markdown(f"Alguien tiene que decidir cuál de los dos valores vale. La "
-                    f"organización no es plana: la matriz de Pablo reparte el "
-                    f"mando en tres áreas y tres niveles. La pregunta es a qué "
-                    f"área pertenece **{gob['etiqueta'].lower()}**.")
-        ui.lecturas_de_campo(gob["lecturas"])
-        if gob["acuerdo"]:
-            st.success("Las dos fuentes coinciden en el ámbito, así que el "
-                       "responsable no está en duda.")
+        if len(alarma["discrepancias"]) > 1:
+            st.markdown("**Las demás diferencias del mismo pedido**")
+            st.dataframe(pd.DataFrame([{
+                "Campo": d["etiqueta"],
+                "Dice el cliente": _miles(d["valor_cliente"]),
+                "Dice la orden": _miles(d["valor_orden"]),
+                "Gravedad si se propaga": d["severidad_esperada"],
+            } for d in alarma["discrepancias"]
+                if d is not alarma["principal"]]), use_container_width=True,
+                hide_index=True)
+
+        st.markdown("**Contraste con la salida del módulo**")
+        st.caption("La salida del módulo se le entrega al sistema; no se va a "
+                   "buscar. Es la frontera declarada de este trabajo.")
+        if "consola_respuesta" not in st.session_state:
+            st.session_state.consola_respuesta = ""
+        c1, c2 = st.columns([1, 3])
+        if c1.button("Cargar la salida del módulo", use_container_width=True,
+                     key="consola_ej"):
+            st.session_state.consola_respuesta = auditoria.EJEMPLO
+        c2.caption("Carga la respuesta real que el módulo de Juan emitió sobre "
+                   "un pedido con esta misma pareja de discrepancias.")
+        resp = st.text_area("Salida", key="consola_respuesta", height=120,
+                            label_visibility="collapsed")
+        an = consola.analisis_incongruencias(alarma, resp)
+        for av in an["avisos"]:
+            st.warning(av)
+        if an["hay_salida"]:
+            obs = an["observacion"]
+            ui.fila_kpis([
+                ui.kpi("Reporta el módulo", str(len(an["reportados"])),
+                       "incidencias"),
+                ui.kpi("Confirmadas", f'{len(obs["vistas"])}/'
+                       f'{len(obs["discrepancias"])}',
+                       "por la lectura propia del sistema", acento=True),
+                ui.kpi("Sin sostener", str(len(obs["inventadas"])),
+                       "no aparecen en los documentos"),
+            ])
+            if not obs["no_vistas"] and not obs["inventadas"]:
+                st.success("El sistema ha leído los documentos por su cuenta y "
+                           "confirma, una a una, las incidencias del módulo. "
+                           "**Nadie tiene que fiarse: se comprueba.**")
+
+    # 2 · Diligencia — el contrato del cliente.
+    with st.expander(f"{a2['nombre']} — {a2['pregunta']}"):
+        st.caption(a2["modulo"])
+        dil = consola.analisis_diligencia(estado["contratos"], date.today())
+        if not dil["aplica"]:
+            ui.nota(dil["motivo"], tono="espera")
         else:
-            # No es un aviso ni un fallo: es una pregunta abierta, y va del color
-            # que este sistema usa para eso.
-            ui.nota(
-                "<b>Las dos lecturas dan responsables distintos.</b> La matriz la "
-                "entregó Pablo y responde de ella; lo que no ha escrito nadie es "
-                "de qué área es cada <b>campo</b> de un pedido. Mencía va de "
-                "contradicción a categoría, Pablo va de rol a área, y la pieza "
-                "del medio no está en ninguno de los dos. El evaluador no elige "
-                "por él: enseña las dos y sigue.", tono="espera")
+            for d in dil["documentos"]:
+                tono = "p-bien" if d["estado"] == "vigente" else "p-mal"
+                st.markdown(
+                    ui.pastilla(d["etiqueta"], tono,
+                                "✓" if d["estado"] == "vigente" else "✕")
+                    + f'&nbsp;&nbsp;<b>{html.escape(d["nombre"])}</b>',
+                    unsafe_allow_html=True)
+                ui.fila_kpis([
+                    ui.kpi("En vigor desde",
+                           d["inicio"].strftime("%d/%m/%Y") if d["inicio"] else "—",
+                           "según el propio documento"),
+                    ui.kpi("Hasta",
+                           d["fin"].strftime("%d/%m/%Y") if d["fin"] else "—",
+                           f'quedan {d["dias"]} días' if d["dias"] is not None
+                           else "sin plazo declarado", acento=True),
+                    ui.kpi("Preaviso",
+                           f'{d["preaviso"]} días' if d["preaviso"] else "—",
+                           "para denunciar el contrato"),
+                ])
+                if d["preaviso_urgente"]:
+                    st.error("**La ventana de preaviso se está cerrando.** Si se "
+                             "quiere denunciar el contrato hay que hacerlo ya.")
+                st.caption(d["por_que"])
 
-    # --- El organigrama de Pablo, dibujado y clicable ---------------------
-    #
-    # Sin esto, su aportación es un JSON de ocho roles: se cree o no se cree.
-    # Puesto en su rejilla se ve de un vistazo por qué un administrativo puede
-    # proponer y no cerrar, que es lo que hay que entender antes de la fase 3.
+    # 3 · Similitud — y aquí el sistema dice que no puede.
+    with st.expander(f"{a3['nombre']} — {a3['pregunta']}"):
+        st.caption(a3["modulo"])
+        sim = consola.analisis_similitud()
+        ui.nota(sim["motivo"], tono="espera")
+        if sim.get("ejemplo"):
+            st.caption(f'Consulta del módulo: {sim["ejemplo"]["consulta"]} · '
+                       f'{sim["ejemplo"]["descartados"]} candidatas descartadas '
+                       f'antes de puntuar.')
+            st.dataframe(pd.DataFrame([{
+                "Posición": r["posicion"], "Proyecto": r["id_proyecto"],
+                "Puntuación": round(r["puntuacion"], 3),
+            } for r in sim["ejemplo"]["resultados"]]),
+                use_container_width=True, hide_index=True)
+
+
+def pantalla_consola():
+    """
+    La aplicación: un sistema que ya está funcionando y un operario que llega.
+
+    Por qué no es un recorrido de pantallas
+    ----------------------------------------
+    La versión anterior era un asistente de seis pasos con su barra de progreso.
+    Se entendía, pero se entendía como una demostración. Lo que hay que enseñar
+    es un producto, y la diferencia práctica es quién manda: en un asistente
+    manda el guion, y en un producto manda lo que está ocurriendo.
+
+    Aquí el sistema ya ha leído la documentación que había, ha contrastado cada
+    pedido consigo mismo y tiene una cola de alarmas abiertas antes de que nadie
+    abra la pantalla. El operario no arranca nada: se pone al mando.
+
+    Las cuatro partes del esquema
+    ------------------------------
+    · flujo continuo — la barra de arriba y la cola de alarmas
+    · herramientas   — tres análisis sobre la alarma que se esté atendiendo
+    · ontología      — quién eres y qué te deja hacer ESTA alarma
+    · aprendizaje    — lo ya decidido vuelve como precedente
+    """
+    docs = _consola_docs()
+    docs, avisos = clasificacion.anotar_tipos(
+        docs, auditoria.clasificar, auditoria.TIPOS, "determinista",
+        permiso=llm.permiso_de(auditoria.FICHA))
+
+    # El sistema no espera a que nadie pulse: al abrir la pantalla ya está hecho.
+    estado = consola.arrancar(docs, auditoria.clasificar)
+    resueltas = st.session_state.setdefault("consola_resueltas", set())
+    abiertas = [a for a in estado["alarmas"] if a["etiqueta"] not in resueltas]
+
     onto = autoridad.cargar()
-    categoria = None
-    rol_actual = None
-    if gob.get("disponible") and onto:
-        st.markdown("**El organigrama, y tu puesto en él**")
-        cats = [l["categoria"] for l in gob["lecturas"]]
-        if len(cats) > 1:
-            # En vez de elegir una lectura en silencio, se elige a la vista y se
-            # puede cambiar. Cambiarla es la demostración: el mismo puesto pasa
-            # de poder cerrar la contradicción a no poder tocarla.
-            categoria = st.radio(
-                "Bajo qué lectura del campo quieres trabajar",
-                cats, horizontal=True, key="lectura_caso",
-                format_func=lambda c: f"si «{c}» → {autoridad.area_de(c)}")
-            st.caption("Las dos son plausibles y nadie ha escrito cuál vale. "
-                       "Cámbiala y mira cómo cambia quién puede cerrar el caso: "
-                       "eso es exactamente lo que cuesta que falte el mapa.")
-        else:
-            categoria = cats[0]
+    todos = (onto or {}).get("roles", [])
+    # De más bajo a más alto. El operario que abre la consola en una empresa no
+    # suele ser el director general, y además así el primer intento enseña el
+    # escalón que hay que enseñar.
+    roles = [r["rol"] for r in sorted(todos, key=lambda r: -r["nivel"])]
+    operario = st.session_state.get("consola_rol") or (roles[0] if roles else None)
 
-        rol_actual = ui.mapa_organizativo(onto, "caso", categoria, autoridad)
-        st.markdown('<div class="org-pie">Los puestos en gris no pueden '
-                    'intervenir en esta contradicción: son de otra área. Que la '
-                    'imposibilidad se vea <b>antes</b> de intentarlo, y no '
-                    'después con un error, es parte de lo que aporta tener el '
-                    'organigrama en el sistema.</div>', unsafe_allow_html=True)
-
-    # ------------------------------------------------------- 3 · DECIDIR
-    # La cabecera se reserva y se rellena al final: su estado depende de si hay
-    # exportación, y eso no se sabe hasta después de pintar los dos cargadores.
-    # Escribirlo a mano dejaría el punto en discontinuo para siempre, incluso el
-    # día en que Mencía mande el fichero — que es justo el error que este bloque
-    # le reprocha a los demás.
-    hueco_fase_3 = st.empty()
-    st.caption("Quien no tiene autoridad suficiente propone; quien la tiene "
-               "valida. Para comprobarlo hace falta su exportación de este "
-               "pedido: antes y después de resolver, porque una sola foto no "
-               "enseña qué cambió ni qué se perdió por el camino.")
-
-    # --- Ensayo de la cadena: dos sesiones seguidas -----------------------
+    # ------------------------------------------------- 1 · ENTRADA DEL USUARIO
     #
-    # Esto NO simula el módulo de Mencía: reproduce la regla que aplica —quien
-    # está en el área propone, quien manda sobre ella valida— para poder
-    # enseñarla funcionando y cruzarla con la matriz de Pablo. Nada de lo que
-    # pase aquí puntúa contra ella, y la pantalla lo dice: puntuar a alguien
-    # contra una maqueta hecha por uno mismo es el error que este bloque le
-    # reprocha a los demás.
-    if categoria and onto:
-        with st.expander("Ensayar la cadena de validación (dos sesiones)",
-                         expanded=True):
-            ui.nota("<b>Esto reproduce la regla, no la salida de su módulo.</b> "
-                    "Sirve para ver funcionando los dos escalones y para cruzar "
-                    "cada uno con el organigrama. No cuenta como evaluación de "
-                    "Mencía: cuando llegue su exportación, el mismo cruce se "
-                    "ejecuta sobre datos suyos y entonces sí emite veredicto.",
-                    tono="espera")
+    # La pantalla 1 del guion de Fabián. Va antes que nada porque su comprensión
+    # es «la aplicación sabe quién soy y qué puedo hacer», y eso no se puede
+    # enseñar después de haber visto ya media aplicación.
+    if not st.session_state.get("consola_dentro"):
+        st.markdown(
+            '<div class="hero"><div class="eyebrow">GraphyCems · entrada</div>'
+            '<h1>Identifícate para entrar en la consola</h1>'
+            '<div class="meta">Mientras tanto el sistema sigue trabajando: '
+            f'lleva {estado["documentos"]} documentos leídos y '
+            f'{len(abiertas)} alarma(s) esperando a alguien.</div></div>',
+            unsafe_allow_html=True)
+        ui.naturaleza(naturaleza.capas_de("sesion"))
+        if not roles:
+            st.error("No hay organigrama cargado: sin él no se puede saber quién "
+                     "es nadie ni qué puede hacer.")
+            st.stop()
+        elegido = st.selectbox(
+            "Entra como", roles, key="consola_rol",
+            format_func=lambda n: next(
+                f'{r["rol"]} — nivel {r["nivel"]}, {r["area"]}'
+                for r in todos if r["rol"] == n))
+        ficha = next(r for r in todos if r["rol"] == elegido)
+        ui.ficha_sesion(
+            ficha["rol"], f'{ficha["nivel"]} · {ficha["tipo_de_autoridad"]}',
+            ficha["area"], "GraphyCems", ficha["manda_sobre"],
+            (f'{memoria.resumen()["decisiones"]} decisiones registradas en el '
+             f'sistema') if memoria.resumen()["decisiones"] else
+            "sin actividad registrada todavía")
+        st.button("Entrar", type="primary", key="consola_entrar",
+                  on_click=lambda: st.session_state.update(consola_dentro=True))
+        return
 
-            estado = st.session_state.setdefault("cadena_caso", sesion.nueva())
-            res = sesion.resumen(estado, categoria)
-            ui.cadena_de_custodia(res)
+    ui.barra_consola(
+        "GraphyCems · Consola de control",
+        f'En marcha · {estado["documentos"]} documentos leídos',
+        operario)
 
-            if not rol_actual:
-                st.info("Elige tu puesto en el organigrama de arriba para poder "
-                        "iniciar sesión.")
-            else:
-                ui.sesion_iniciada(rol_actual, onto, categoria, autoridad)
-                b1, b2 = st.columns([2, 1])
-                if b1.button(f"Entrar como {rol_actual} y resolver la "
-                             f"contradicción", type="primary",
-                             use_container_width=True, key="btn_entrar"):
-                    nuevo, r = sesion.entrar(estado, rol_actual, categoria)
-                    st.session_state.cadena_caso = nuevo
-                    st.session_state.ultimo_intento = r
-                    st.rerun()
-                if b2.button("Empezar de cero", use_container_width=True,
-                             key="btn_reset_cadena"):
-                    st.session_state.cadena_caso = sesion.nueva()
-                    st.session_state.pop("ultimo_intento", None)
-                    st.rerun()
+    mem = memoria.resumen()
+    ui.franja_cifras([
+        (estado["pedidos"], "pedidos analizados"),
+        (len(estado["limpios"]) + len(resueltas), "despachados"),
+        (len(abiertas), "alarmas abiertas"),
+        (mem["decisiones"], "decisiones en memoria"),
+    ])
+    for a in avisos:
+        st.info(a)
 
-            r = st.session_state.get("ultimo_intento")
-            if r:
-                if r.get("aviso"):
-                    ui.nota(f'<b>Aviso al entrar.</b> {html.escape(r["aviso"])} '
-                            f'Es el mismo que salta en el módulo de Mencía.',
+    # Una alarma recién cerrada NO desaparece de la pantalla: se queda enseñando
+    # cómo quedó, con su rastro, hasta que el operario vuelve a la cola. Si se
+    # cerrara sola se perdería justo el momento que hay que ver — el pedido
+    # respondiendo ya con el valor decidido.
+    activa = st.session_state.get("consola_alarma")
+    if activa and activa not in [a["etiqueta"] for a in estado["alarmas"]]:
+        activa = st.session_state.consola_alarma = None
+
+    # ------------------------------------------------------------- LA COLA
+    if not activa:
+        # El marcador del guion: «4 correctos · 1 incidencia». Dice de un
+        # vistazo que el sistema no avisa de todo lo que mira.
+        st.markdown(
+            f'**{len(estado["limpios"]) + len(resueltas)} correctos · '
+            f'{len(abiertas)} incidencia(s)** — el sistema ha contrastado los '
+            f'{estado["pedidos"]} pedidos que había en la bandeja.')
+        ui.naturaleza(naturaleza.capas_de("vigilancia"))
+        st.markdown("### Alarmas abiertas")
+        if not abiertas:
+            st.success("No queda ninguna alarma abierta. El sistema sigue "
+                       "leyendo lo que entre.")
+        for a in abiertas:
+            p = a["principal"]
+            imp = flujo.impacto(p)
+            ui.tarjeta_alarma(
+                p.get("severidad_esperada", "—").upper(),
+                f'Pedido {a["etiqueta"]} · {a["n"]} documentos',
+                f'{p["etiqueta"]}: el cliente pide {_miles(p["valor_cliente"])} '
+                f'y la orden manda fabricar {_miles(p["valor_orden"])}',
+                (f'**{_miles(imp["exceso"])} unidades de más**, '
+                 f'{imp["veces"]:g} veces lo pedido.' if imp else "")
+                + (f' Y {len(a["discrepancias"]) - 1} diferencia(s) menor(es) '
+                   f'en el mismo pedido.' if len(a["discrepancias"]) > 1 else ""))
+            if st.button(f'Atender la alarma del pedido {a["etiqueta"]}',
+                         key=f'atender_{a["etiqueta"]}', type="primary"):
+                st.session_state.consola_alarma = a["etiqueta"]
+                st.rerun()
+
+        if estado["limpios"]:
+            with st.expander(f'Despachados sin incidencias '
+                             f'({len(estado["limpios"])})'):
+                st.caption("El sistema los ha contrastado y no ha encontrado "
+                           "nada. No han molestado a nadie, y ésa es la mitad "
+                           "del trabajo que hace.")
+                for r in estado["limpios"]:
+                    st.markdown(f'- **Pedido {r["etiqueta"]}** — '
+                                f'{r["n"]} documentos, todos coinciden.')
+        if estado["incompletos"]:
+            with st.expander(f'Sin poder contrastar '
+                             f'({len(estado["incompletos"])})'):
+                for r in estado["incompletos"]:
+                    ui.nota(f'<b>{r["etiqueta"]}</b> — {r["motivo"]}',
                             tono="espera")
-                if r["accion"] == "validacion":
-                    st.success(r["mensaje"])
-                elif r["accion"] == "propuesta":
-                    ui.nota(f'<b>Propuesta registrada.</b> {r["mensaje"]}',
-                            tono="espera")
-                elif r["accion"] == "rechazada":
-                    st.error(f'**No se ha registrado nada.** {r["mensaje"]} '
-                             f'{r["motivo"]}.')
-                else:
-                    ui.nota(r["mensaje"], tono="espera")
-                if res["quien_puede_cerrarla"] and not res["cerrada"]:
-                    st.caption("Quien puede cerrarla: "
-                               + ", ".join(res["quien_puede_cerrarla"]) + ".")
 
-    st.markdown("**La exportación real de Mencía**")
-    c1, c2 = st.columns(2)
-    ex_antes = c1.file_uploader("Exportación ANTES de resolver", type=["json"],
-                               key="caso_antes")
-    ex_despues = c2.file_uploader("Exportación DESPUÉS de resolver", type=["json"],
-                                 key="caso_despues")
+        st.markdown("### Memoria del sistema")
+        st.caption("Lo que se ha ido decidiendo. No hay ningún modelo "
+                   "entrenado: hay precedente, que es lo que se puede abrir, "
+                   "leer y discutir.")
+        ui.panel_memoria(mem)
+        if mem["decisiones"]:
+            if st.button("Olvidar todo (para repetir la demostración)",
+                         key="consola_olvidar"):
+                memoria.olvidar()
+                st.session_state.consola_resueltas = set()
+                st.rerun()
+        return
 
-    def _leer(f):
-        if not f:
-            return None
-        d, avs = contradicciones.interpretar(f.getvalue().decode("utf-8"))
-        for a in avs:
-            st.warning(f"{f.name}: {a}")
-        return d
+    # -------------------------------------------- EL DASHBOARD DE LA ALARMA
+    alarma = next(a for a in estado["alarmas"] if a["etiqueta"] == activa)
+    resultado = st.session_state.get(f'resultado_{alarma["etiqueta"]}')
+    ya_cerrada = alarma["etiqueta"] in resueltas
+    principal = alarma["principal"]
+    imp = flujo.impacto(principal)
 
-    d_antes, d_despues = _leer(ex_antes), _leer(ex_despues)
-    dec = caso.decidir(gob, d_antes, d_despues, pedido=pedido)
-    with hueco_fase_3.container():
-        ui.cabecera_fase(3, "Decidir", "Alguien valida, y la decisión se guarda",
-                         "Mencía Viñuelas · cadena de validación",
-                         "ejecutada" if dec.get("disponible")
-                         and not dec.get("requiere") else
-                         "parcial" if dec.get("disponible") else "pendiente")
+    if st.button("← Volver a la cola", key="consola_volver"):
+        st.session_state.consola_alarma = None
+        st.rerun()
 
-    if not dec.get("disponible"):
-        ui.nota(f"<b>{dec['motivo']}</b> Falta {dec['requiere']}.", tono="espera")
-        st.caption("El paso no se inventa. Un recorrido que fingiera esta parte "
-                   "sería una demo más bonita y una demostración peor: lo que se "
-                   "está demostrando es que el sistema distingue lo comprobado "
-                   "de lo supuesto.")
-    else:
-        for v in dec["veredictos"]:
-            with st.container(border=True):
-                st.markdown(f"**{v['campo']}** — resuelto por "
-                            f"**{v['revisor'] or 'nadie identificado'}**")
-                for p in v["por_lectura"]:
-                    pastilla = ("p-bien", "✓", "Tenía autoridad") if p["podia"] is True \
-                        else ("p-mal", "✕", "No tenía autoridad") if p["podia"] is False \
-                        else ("p-espera", "◌", "No se puede saber")
-                    st.markdown(
-                        f'{ui.pastilla(pastilla[2], pastilla[0], pastilla[1])} '
-                        f'<span style="font-size:.85rem;color:var(--tinta-2)">si '
-                        f'«{p["categoria"]}» — {p["motivo"]}</span>',
-                        unsafe_allow_html=True)
-            if not v["concluyente"]:
-                # El nombre viene de la exportación de otro módulo: se escapa.
-                quien = html.escape(str(v["revisor"] or "quien resolvió"))
-                ui.nota(
-                    f"<b>La misma validación sale bien y mal según el mapa que "
-                    f"falta.</b> {quien} tenía "
-                    f"autoridad bajo una lectura y no bajo la otra. No es una "
-                    f"duda del evaluador sobre Mencía: es que la pregunta no se "
-                    f"puede cerrar hasta que Pablo escriba de qué área es este "
-                    f"campo. <b>Ésta es exactamente la pregunta que ningún "
-                    f"módulo puede contestar solo</b>, y por eso hace falta un "
-                    f"bloque que tenga los dos delante.", tono="espera")
-        if dec.get("hay_comparacion"):
-            ui.panel_cambios(d_antes, d_despues, contradicciones.comparar_estados)
-        elif dec["veredictos"]:
-            st.caption("Con una sola exportación se puede comprobar quién validó, "
-                       "pero no qué cambió al validar. Sube también la otra.")
+    ui.naturaleza(naturaleza.capas_de("panel"), pie=False)
+    ui.aviso_incidencia(
+        f'Pedido {alarma["etiqueta"]}: la orden manda fabricar '
+        f'{_miles(principal["valor_orden"])} de los '
+        f'{_miles(principal["valor_cliente"])} que pidió el cliente'
+        if imp else f'Pedido {alarma["etiqueta"]}: {principal["etiqueta"]}',
+        "Nadie ha pedido que se revise este pedido. El sistema lo encontró al "
+        "contrastar la orden de fabricación con la documentación de cliente, "
+        "mientras despachaba el resto de la bandeja sin molestar a nadie.")
 
-    # ------------------------------------------------------- 4 · COMPROBAR
-    comp = caso.comprobar(obs, gob, dec)
-    ui.cabecera_fase(4, "Comprobar", "¿Es correcto y reproducible?",
-                     "Íñigo Daza · bloque de evaluación y calidad")
+    ui.enfrentar(
+        {"que": "Pidió el cliente", "valor": _miles(principal["valor_cliente"]),
+         "fuente": next((d["nombre"] for d in alarma["documentos"]
+                         if d["tipo"] == "pedido_cliente"), "")},
+        {"que": "Iba a fabricarse", "valor": _miles(principal["valor_orden"]),
+         "fuente": next((d["nombre"] for d in alarma["documentos"]
+                         if d["tipo"] == "orden"), "")})
 
-    st.markdown(f"El recorrido llega hasta donde llegan los datos: "
-                f"**{comp['recorrido']} de {comp['total']} fases** se han podido "
-                f"ejecutar enteras. Ni el estado de cada una ni lo que le falta "
-                f"están escritos a mano: los declara la propia fase, así que esto "
-                f"no puede quedarse obsoleto cuando lleguen los datos.")
+    if imp:
+        with st.expander("Ponerle precio (opcional)"):
+            st.caption("El sistema no se inventa el coste. Si quieres verlo en "
+                       "euros, escribe tú el coste unitario.")
+            cu = st.number_input("Coste unitario (€)", min_value=0.0, step=0.10,
+                                 value=0.0, key="consola_coste")
+            if cu:
+                st.metric("Coste de fabricar lo que nadie pidió",
+                          f'{flujo.impacto(principal, cu)["coste"]:,.2f} €'
+                          .replace(",", "."))
 
-    # La espina se rellena con los datos, no con el scroll: se vuelve discontinua
-    # exactamente donde el recorrido se corta.
-    ui.linea_del_hilo(comp["fases"], caso.REGLA)
+    # --- Ontología: quién eres y qué te deja hacer esta alarma -------------
+    st.markdown("#### Quién está al mando")
+    ui.naturaleza(naturaleza.capas_de("autoridad"))
+    c1, c2 = st.columns([2, 1])
+    rol = c1.selectbox(
+        "Operario", roles, key="consola_rol",
+        index=roles.index(operario) if operario in roles else 0,
+        label_visibility="collapsed")
+    with c2.popover("Ver el organigrama", use_container_width=True):
+        st.caption("La ontología de la empresa. De aquí sale si tu puesto puede "
+                   "cerrar esta alarma o sólo proponer.")
+        ui.mapa_organizativo(onto, "consola",
+                             consola.categoria_de(alarma), autoridad)
 
-    with st.expander("Evaluar a fondo el módulo de Juan sobre estos documentos"):
-        st.caption("Este recorrido enseña el caso. La batería completa —los 12 "
-                   "casos, las dos métricas, el veredicto y el informe— está en "
-                   "«Evaluar un módulo».")
-        st.dataframe(pd.DataFrame([{
-            "Campo": etiqueta,
-            "Documentación de cliente": contexto["cliente"].get(k, "—"),
-            "Orden de fabricación": contexto["orden"].get(k, "—"),
-        } for k, etiqueta in auditoria.ETIQUETAS.items()]),
-            use_container_width=True, hide_index=True)
+    ctx = consola.contexto_operario(rol, alarma, onto)
+    ui.contexto_del_operario(ctx)
+
+    # --- Aprendizaje: ¿esto ya ha pasado? ---------------------------------
+    sug = memoria.sugerencia(principal,
+                             contexto=consola.contexto_del_caso(alarma),
+                             excepto=alarma["etiqueta"])
+    if sug:
+        ui.precedente(sug)
+        if sug.get("descartados"):
+            st.caption(f'{len(sug["descartados"])} caso(s) parecido(s) '
+                       f'descartado(s): {sug["descartados"][0].get("descartado_porque", "")}.')
+
+    _herramientas(alarma, estado)
+
+    # --- Actuación --------------------------------------------------------
+    if ya_cerrada:
+        r = resultado or {}
+        st.markdown("#### Cierre, memoria y aprendizaje")
+        ui.naturaleza(naturaleza.capas_de("memoria"))
+        st.success(r.get("mensaje", "Alarma cerrada."))
+        ui.consulta_pedido(
+            f'{principal["etiqueta"]} · pedido {alarma["etiqueta"]}',
+            _miles(r.get("valor", principal["valor_cliente"])),
+            "El pedido ya responde con el valor decidido y no vuelve a mostrar "
+            "el conflicto. Lo que se guarda no es sólo el número: es **quién lo "
+            "decidió y con qué autoridad**.",
+            ["Detectada por el sistema al contrastar la orden con la "
+             "documentación de cliente."]
+            + ([f'Revisada antes por **{r["propuesta_por"]}**, que está en el '
+                f'área pero no manda sobre ella.']
+               if r.get("propuesta_por") else [])
+            + [f'Cerrada por **{r.get("cerrada_por", ctx["rol"])}**, con '
+               f'autoridad declarada sobre {ctx["area_afectada"]}.',
+               'Registrada en la memoria: la próxima alarma de esta clase '
+               'llegará con este precedente puesto.'])
+
+        if r.get("registro"):
+            st.markdown("**El criterio que queda guardado**")
+            st.caption("Dos mitades, y las dos hacen falta. La izquierda permite "
+                       "auditar la decisión dentro de seis meses; la derecha "
+                       "permite saber si el criterio **aplica** a un caso nuevo. "
+                       "Un precedente sin condiciones es una regla disfrazada.")
+            ui.registro_criterio(r["registro"])
+
+        st.button("← Volver a la cola", key="consola_volver_pie",
+                  type="primary",
+                  on_click=lambda: st.session_state.update(consola_alarma=None))
+        return
+
+    st.markdown("#### Actuación")
+    ui.naturaleza(naturaleza.capas_de("decision"))
+    posibles = consola.acciones_para(ctx)
+    st.caption("Sólo aparecen las acciones que tu puesto permite. Un botón que "
+               "no se puede pulsar no se enseña apagado: se sustituye por el que "
+               "sí corresponde.")
+
+    propuesta = st.session_state.get(f'propuesta_{alarma["etiqueta"]}')
+    if propuesta:
+        just_previa = st.session_state.get(f'just_{alarma["etiqueta"]}')
+        ui.nota(f'<b>Ya revisada por {html.escape(propuesta)}</b>, pendiente de '
+                f'validación. Es el aviso que salta en el módulo de Mencía '
+                f'cuando entra alguien con autoridad.'
+                + (f'<br>Lo justificó así: «{html.escape(just_previa)}»'
+                   if just_previa else ""), tono="espera")
+
+    # La justificación no es un campo más: es lo que convierte una decisión en un
+    # criterio reutilizable. Sin ella, dentro de seis meses queda un número y
+    # nadie sabe por qué. Fabián lo dice explícito en la pantalla 7 —«el
+    # encargado propone y justifica»— y el sistema no registra sin ella.
+    justificacion = st.text_area(
+        "Por qué decides esto", height=80,
+        key=f'entrada_just_{alarma["etiqueta"]}',
+        placeholder="El pedido y el presupuesto coinciden en 3.000; la orden "
+                    "lleva un cero de más.")
+    if sug and sug.get("ultimo", {}).get("justificacion"):
+        st.caption(f'La vez anterior se justificó así: '
+                   f'«{sug["ultimo"]["justificacion"]}»')
+
+    valor = None
+    if "corregir" in posibles:
+        with st.expander("Corregir con otro valor"):
+            valor = st.text_input(
+                f'{principal["etiqueta"]} correcta', key="consola_valor",
+                placeholder=str(principal["valor_cliente"]))
+
+    cols = st.columns(len(posibles))
+    for col, acc in zip(cols, posibles):
+        etiqueta, _ = consola.ACCIONES[acc]
+        if col.button(etiqueta, key=f'acc_{acc}', use_container_width=True,
+                      type="primary" if acc == "aceptar" else "secondary"):
+            r = consola.actuar(alarma, acc, ctx, valor, propuesta,
+                               justificacion=justificacion)
+            r["cerrada_por"] = ctx["rol"]
+            st.session_state[f'resultado_{alarma["etiqueta"]}'] = r
+            if r["cerrada"]:
+                st.session_state.consola_resueltas = resueltas | {alarma["etiqueta"]}
+            elif r.get("propuesta_por"):
+                st.session_state[f'propuesta_{alarma["etiqueta"]}'] = r["propuesta_por"]
+                st.session_state[f'just_{alarma["etiqueta"]}'] = r.get("justificacion")
+            st.rerun()
+
+    r = st.session_state.get(f'resultado_{alarma["etiqueta"]}')
+    if r and not r["cerrada"]:
+        if r.get("falta_justificacion"):
+            st.error(f'**No se ha registrado nada.** {r["mensaje"]}')
+        else:
+            ui.nota(r["mensaje"], tono="espera")
 
 
 # ===========================================================================
@@ -1504,7 +1700,7 @@ def pantalla_evaluar():
 
 if pantalla == "Esquema del sistema":
     pantalla_esquema()
-elif pantalla == "Seguir un caso":
-    pantalla_caso()
+elif pantalla == "Consola":
+    pantalla_consola()
 else:
     pantalla_evaluar()

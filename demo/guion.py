@@ -114,7 +114,10 @@ def documentos_de(id_modulo, solo=None):
     carpeta = RAIZ / id_modulo
     if not carpeta.is_dir():
         return []
-    rutas = sorted(carpeta.glob("*.pdf"))
+    # Recursivo: la bandeja de la demo guarda cada pedido en su subcarpeta, que
+    # es como llegan de verdad. Para las carpetas planas de siempre no cambia
+    # nada, porque `rglob` también encuentra lo que está en la raíz.
+    rutas = sorted(carpeta.rglob("*.pdf"))
     if solo:
         quiere = {s.lower() for s in solo}
         rutas = [r for r in rutas if r.name.lower() in quiere]
