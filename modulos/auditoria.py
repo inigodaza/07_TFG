@@ -278,6 +278,14 @@ SENALES = {
         r"\btext\s+paper\s*:", r"\btrimmed\s+size\s*:", r"\bbinding\s*:",
         r"\bpurchase\s+order\b", r"\bwe\s+hereby\s+order\b",
         r"\bdelivery\s+(date|address)\b", r"\bre\s*:\s*\d{13}\b",
+        # El bon de commande francés. Es el mismo documento —el cliente
+        # encargando— y hasta ahora el sistema lo clasificaba «desconocido» y lo
+        # dejaba fuera de la comparación en silencio. Eso no es «no hay
+        # incongruencias»: es «no sé leer la mitad del caso», que es una cosa
+        # muy distinta y mucho peor de callar.
+        r"\bbon\s+de\s+commande\b", r"\btirage\s*:", r"\bpagination\s*:",
+        r"\bformat\s+bloc\s+texte\s*:", r"\bmarque\s+[ée]ditoriale\s*:",
+        r"\bdate\s+de\s+remise\s+des\b", r"\bfa[çc]onnage\b",
     ],
     "presupuesto": [
         r"please\s+find\s+herewith\s+our\s+prices", r"\bcps\.\s*=",
@@ -361,15 +369,57 @@ def campos_orden(texto):
     if m:
         c["isbn"] = m.group(1)
         c["formato"] = formato_normal(m.group(2))
+    # La orden también escribe el ISBN con guiones bajo su etiqueta. Es el mismo
+    # número, y sin recogerlo el campo no entraba en la comparación: no se
+    # detectaba un ISBN cambiado, que es de los errores más caros que hay.
+    if "isbn" not in c:
+        m = re.search(r"ISBN\s*:?[^\n]{0,120}?((?:\d[-\s]?){12}\d)",
+                      texto, re.IGNORECASE)
+        if m:
+            c["isbn"] = re.sub(r"[^\d]", "", m.group(1))
     return c
 
 
-def campos_cliente(texto):
+MARCA_ESPECIFICACION = re.compile(
+    r"\*+\s*SPECIFICATION\s+OF\s+[^\n]*?((?:\d[-\s]?){12}\d)[^\n]*", re.IGNORECASE)
+
+
+def bloque_del_isbn(texto, isbn):
     """
-    Campos de la documentación de cliente. Cubre los dos formatos observados: la
-    carta de pedido y el presupuesto, que expresan los mismos datos de forma
-    distinta.
+    El trozo del pedido que habla del libro que fabrica esta orden.
+
+    Una orden de compra puede cubrir **varios productos**: la de Cambridge es de
+    un pack y trae dos especificaciones seguidas, una por libro, cada una con su
+    gramaje y su formato. Leer el documento entero mezcla los dos y compara la
+    orden contra el libro equivocado.
+
+    Si el documento marca sus bloques por ISBN y se sabe cuál fabrica la orden,
+    se recorta el suyo. Si no se sabe, se devuelve el texto entero: perder la
+    precisión es aceptable, inventársela no.
     """
+    if not isbn:
+        return texto
+    objetivo = re.sub(r"[^\d]", "", str(isbn))
+    marcas = list(MARCA_ESPECIFICACION.finditer(texto or ""))
+    if len(marcas) < 2:
+        return texto
+    for i, m in enumerate(marcas):
+        if re.sub(r"[^\d]", "", m.group(1)) == objetivo:
+            fin = marcas[i + 1].start() if i + 1 < len(marcas) else len(texto)
+            return texto[m.end():fin]
+    return texto
+
+
+def campos_cliente(texto, isbn=None):
+    """
+    Campos de la documentación de cliente. Cubre los formatos observados: la
+    carta de pedido inglesa, el presupuesto, la orden de compra por líneas y el
+    bon de commande francés, que expresan los mismos datos de forma distinta.
+
+    `isbn` acota la lectura al bloque del libro que fabrica la orden cuando el
+    documento cubre varios.
+    """
+    texto = bloque_del_isbn(texto, isbn)
     c = {}
     directos = {
         "cantidad":         r"Quantity:\s*([\d.,]+)\s*copies",
@@ -382,6 +432,31 @@ def campos_cliente(texto):
         if m:
             c[clave] = numero(m.group(1))
 
+    # --- Un rango no es un valor
+    #
+    # El pedido de Cambridge pide la cubierta en «240-260gsm»: no está fijando
+    # un gramaje, está fijando una horquilla. La orden pone 250, que está
+    # dentro, y sin embargo el extractor se quedaba con el 260 del final del
+    # rango y el sistema habría emitido una incongruencia **falsa** contra la
+    # fábrica.
+    #
+    # Un falso positivo es el fallo más caro que puede cometer este sistema: si
+    # avisa de cosas que están bien, dejan de mirarse los avisos, y entonces
+    # tampoco se ve el que sí importaba. Así que el rango se guarda como rango y
+    # la comparación lo respeta.
+    c.setdefault("rangos", {})
+    for clave, etiqueta in (("gramaje_cubierta", "Cover"),
+                            ("gramaje_interior", r"TEXT|Text Paper|Inside")):
+        m = re.search(rf"(?:{etiqueta})\s*:?[^\n]{{0,80}}?(\d{{2,3}})\s*-\s*"
+                      rf"(\d{{2,3}})\s*gsm", texto, re.IGNORECASE)
+        if m:
+            lo, hi = int(m.group(1)), int(m.group(2))
+            c["rangos"][clave] = (min(lo, hi), max(lo, hi))
+            # El valor que se enseña es el rango entero, escrito como lo escribió
+            # el cliente. Elegir uno de los dos extremos sería inventarse una
+            # exigencia que el documento no hace.
+            c[clave] = f"{min(lo, hi)}-{max(lo, hi)}"
+
     m = re.search(r"RE:\s*(\d{13})", texto)
     if m:
         c["isbn"] = m.group(1)
@@ -390,6 +465,23 @@ def campos_cliente(texto):
         c["formato"] = formato_normal(m.group(1))
 
     # --- Presupuesto: los mismos datos con otra redacción
+    # La orden de compra por líneas escribe los mismos datos de otra manera, y
+    # dentro de un párrafo de especificación en vez de en un campo etiquetado.
+    otros = {
+        "cantidad":         r"\bPER\s+([\d.,]+)\b",
+        "paginas":          r"Extent\s*:\s*([\d.,]+)\s*pp\b",
+        "gramaje_interior": r"\bTEXT\s*:\s*([\d.,]+)\s*gsm",
+    }
+    for clave, patron in otros.items():
+        if clave not in c:
+            m = re.search(patron, texto, re.IGNORECASE)
+            if m:
+                c[clave] = numero(m.group(1))
+    if "formato" not in c:
+        m = re.search(r"Trim\s+Size\s*:\s*([\d\sx]+)\s*mm", texto, re.IGNORECASE)
+        if m:
+            c["formato"] = formato_normal(m.group(1))
+
     respaldo = {
         "cantidad":         r"([\d.,]+)\s*cps\.\s*=",
         "paginas":          r"Extent\s+([\d.,]+)\s*pp",
@@ -409,6 +501,42 @@ def campos_cliente(texto):
         m = re.search(r"TPS\s+([\d\sx]+)mm", texto, re.IGNORECASE)
         if m:
             c["formato"] = formato_normal(m.group(1))
+
+    # --- El bon de commande francés: los mismos datos con otras palabras
+    #
+    # Va al final y sólo rellena lo que falte, como los demás respaldos. Los
+    # números vienen con espacio fino de millar —«5 000 ex.»— que `numero()` ya
+    # limpia, y la paginación dice «pages» donde el inglés dice «pp».
+    frances = {
+        "cantidad":         r"Tirage\s*:\s*([\d\s.,]+?)\s*ex\b",
+        "paginas":          r"Pagination\s*:\s*([\d\s.,]+?)\s*pages?\b",
+    }
+    for clave, patron in frances.items():
+        if clave not in c:
+            m = re.search(patron, texto, re.IGNORECASE)
+            if m:
+                c[clave] = numero(m.group(1))
+    if "isbn" not in c:
+        m = re.search(r"EAN\s*:\s*(\d{13})", texto, re.IGNORECASE)
+        if m:
+            c["isbn"] = m.group(1)
+    if "formato" not in c:
+        m = re.search(r"Format\s+bloc\s+texte\s*:\s*([\d\sx]+)\s*mm",
+                      texto, re.IGNORECASE)
+        if m:
+            c["formato"] = formato_normal(m.group(1))
+
+    # Los gramajes del francés viven en la tabla de componentes, no en una línea
+    # «campo: valor». Se buscan dentro del bloque de cada componente, que es lo
+    # único que los distingue: los dos dicen sólo «120g» y «265g».
+    for etiqueta, clave in ((r"Int[ée]rieur", "gramaje_interior"),
+                            (r"Couverture", "gramaje_cubierta")):
+        if clave in c:
+            continue
+        m = re.search(rf"{etiqueta}(.{{0,600}}?)(\d{{2,3}})\s*g\b",
+                      texto, re.IGNORECASE | re.DOTALL)
+        if m:
+            c[clave] = numero(m.group(2))
     return c
 
 
@@ -453,9 +581,13 @@ def verdad_de_campo(docs, modo="determinista"):
 
     orden = campos_orden(orden_doc["texto"])
     cliente = {}
+    isbn_orden = orden.get("isbn")
     for d in cliente_docs:                       # los datos pueden venir repartidos
-        for k, v in campos_cliente(d["texto"]).items():
-            cliente.setdefault(k, v)
+        for k, v in campos_cliente(d["texto"], isbn_orden).items():
+            if k == "rangos":
+                cliente.setdefault("rangos", {}).update(v)
+            else:
+                cliente.setdefault(k, v)
 
     procedencia = {}
     if modo != "determinista":
@@ -465,15 +597,24 @@ def verdad_de_campo(docs, modo="determinista"):
                                    FICHA["esquema_campos"], FICHA["prompt_extraccion"])
         procedencia = {"orden": p1, "cliente": p2}
 
+    rangos = cliente.get("rangos") or {}
     esperados = []
     for clave, (etiqueta, severidad) in CAMPOS.items():
         a, b = cliente.get(clave), orden.get(clave)
         if a is None or b is None:
             continue
+        # Si el cliente dio una horquilla, se cumple estando dentro. Comparar el
+        # extremo contra el valor produciría una incongruencia falsa, y un falso
+        # positivo es el fallo más caro de este sistema: si avisa de lo que está
+        # bien, se dejan de mirar los avisos.
+        rango = rangos.get(clave)
+        if rango and numero(b) is not None and rango[0] <= numero(b) <= rango[1]:
+            continue
         if str(a) != str(b):
             esperados.append({"campo": clave, "etiqueta": etiqueta,
                               "valor_cliente": a, "valor_orden": b,
-                              "severidad_esperada": severidad})
+                              "severidad_esperada": severidad,
+                              "rango_cliente": rango})
 
     # `id` lo pone `pdf.leer`, pero esta rama no debería depender de que el
     # documento haya entrado por ahí: un registro construido a mano —una prueba,
