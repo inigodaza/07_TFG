@@ -24,7 +24,7 @@ import streamlit as st
 # viejo también tenía todas las funciones por nombre, la comprobación dio el
 # visto bueno. Lo que había cambiado era la **firma** de una de ellas, no su
 # existencia. Un número por fichero detecta lo que un `hasattr` no ve.
-VERSION_UI = 18
+VERSION_UI = 19
 
 from nucleo import bateria as B  # noqa: F401  (lo usa app.py)
 from nucleo import asesor as AS
@@ -511,6 +511,67 @@ div.stButton > button:disabled{ color:var(--tinta-3); }
 .recibo-fila.f--mal .f-e{ color:var(--mal); }
 .recibo-fila.f--espera .f-e{ color:var(--espera); }
 
+/* --- Cotejo: lo que se ha leído de cada lado ----------------------------- */
+/* Cuando NO hay incongruencia hay que enseñar igual lo leído. Un «todo
+   correcto» sin decir qué se ha mirado no vale nada: lo que tranquiliza no es
+   el veredicto, es ver los cuatro campos comparados. */
+.cotejo{ width:100%; border-collapse:collapse; background:#fff;
+         border:1px solid var(--borde); border-radius:var(--radio);
+         overflow:hidden; font-size:.86rem; }
+.cotejo th{
+  text-align:left; font-size:.66rem; font-weight:700; letter-spacing:.09em;
+  text-transform:uppercase; color:var(--tinta-3); background:var(--plano);
+  padding:.45rem .8rem; border-bottom:1px solid var(--linea);
+}
+.cotejo td{ padding:.45rem .8rem; border-bottom:1px solid var(--linea);
+            color:var(--tinta); }
+.cotejo tr:last-child td{ border-bottom:none; }
+.cotejo .c-ok{ color:var(--bien); font-weight:700; width:2.2rem;
+               text-align:center; }
+.cotejo .c-no{ color:var(--mal); font-weight:700; width:2.2rem;
+               text-align:center; }
+.cotejo .c-nota{ color:var(--tinta-3); font-size:.78rem; }
+.cotejo tr.f--no td{ background:var(--mal-fondo); }
+
+/* --- Auditando: los pasos que va dando ----------------------------------- */
+.audit{ background:#fff; border:1px solid var(--borde);
+        border-radius:var(--radio); padding:.85rem 1rem; margin:.3rem 0 .8rem 0; }
+.audit .a-t{ font-size:.95rem; font-weight:680; color:var(--tinta);
+             margin-bottom:.5rem; display:flex; align-items:center; gap:.5rem; }
+.audit .a-p{ display:flex; align-items:center; gap:.6rem; font-size:.86rem;
+             color:var(--tinta-2); padding:.18rem 0; }
+.audit .a-p .g{ width:1.1rem; text-align:center; flex:none; }
+.audit .a-p.p--hecho{ color:var(--tinta); }
+.audit .a-p.p--hecho .g{ color:var(--bien); }
+.audit .a-p.p--curso .g{ color:var(--acento); }
+.audit .a-p.p--espera{ color:var(--tinta-3); }
+.audit .a-d{ font-size:.78rem; color:var(--tinta-3); margin-left:1.7rem; }
+
+/* --- Los tres cuadros del panel ------------------------------------------ */
+.cuadros{ display:flex; gap:.7rem; flex-wrap:wrap; margin:.4rem 0 .6rem 0; }
+.cuadro{
+  flex:1 1 280px; background:#fff; border:1px solid var(--borde);
+  border-top:3px solid var(--nulo-marca); border-radius:var(--radio);
+  padding:.9rem 1rem; display:flex; flex-direction:column;
+}
+.cuadro--activo{ border-top-color:var(--mal-marca);
+                 box-shadow:0 4px 16px rgba(15,23,42,.08); }
+.cuadro .q-e{ font-size:.66rem; font-weight:700; letter-spacing:.1em;
+              text-transform:uppercase; color:var(--tinta-3); }
+.cuadro--activo .q-e{ color:var(--mal); }
+.cuadro .q-n{ font-size:1.05rem; font-weight:680; color:var(--tinta);
+              margin:.12rem 0 .05rem 0; line-height:1.25; }
+.cuadro .q-m{ font-size:.76rem; color:var(--tinta-3); }
+.cuadro .q-d{ font-size:.84rem; color:var(--tinta-2); line-height:1.5;
+              margin-top:.45rem; }
+.cuadro .q-c{ margin-top:.6rem; border-top:1px solid var(--linea);
+              padding-top:.55rem; }
+.cuadro .q-c .l{ display:flex; justify-content:space-between; gap:.6rem;
+                 font-size:.84rem; padding:.14rem 0; }
+.cuadro .q-c .l b{ color:var(--tinta); font-variant-numeric:tabular-nums; }
+.cuadro .q-c .l .mal{ color:var(--mal); font-weight:680; }
+.cuadro .q-v{ font-size:.76rem; color:var(--tinta-3); margin-top:.5rem; }
+
 /* --- Naturaleza: qué capa resuelve cada pantalla ------------------------- */
 /* Del customer journey de Fabián. No es decoración: es una afirmación sobre el
    sistema, y por eso las etiquetas se leen distinto según sea algo que actúa
@@ -941,6 +1002,99 @@ def cabecera_fase(n, fase, titulo, responsable, estado="ejecutada"):
         f'<div class="fase-tit">{_e(titulo)}</div>'
         f'<div class="fase-quien">{_e(responsable)}</div></div></div>',
         unsafe_allow_html=True)
+
+
+def auditando(pasos, hecho_hasta):
+    """
+    Los pasos que el sistema va dando mientras audita.
+
+    No es una barra de progreso decorativa: cada línea es un paso que ocurre de
+    verdad —leer, reconocer el tipo, extraer, agrupar, contrastar— y verlos
+    caer uno a uno es lo que hace entender que hay trabajo detrás. Un resultado
+    que aparece instantáneo parece una constante escrita a mano.
+    """
+    filas = []
+    for i, (texto, detalle) in enumerate(pasos):
+        if i < hecho_hasta:
+            clase, glifo = "p--hecho", "✓"
+        elif i == hecho_hasta:
+            clase, glifo = "p--curso", "▸"
+        else:
+            clase, glifo = "p--espera", "·"
+        filas.append(f'<div class="a-p {clase}"><div class="g">{glifo}</div>'
+                     f'<div>{_e(texto)}</div></div>')
+        if i == hecho_hasta and detalle:
+            filas.append(f'<div class="a-d">{_e(detalle)}</div>')
+    st.markdown(
+        f'<div class="audit"><div class="a-t">'
+        f'<span class="punto" style="width:8px;height:8px;border-radius:50%;'
+        f'background:var(--acento);display:inline-block"></span>'
+        f'Auditando documentos…</div>{"".join(filas)}</div>',
+        unsafe_allow_html=True)
+
+
+def cotejo(filas):
+    """
+    Campo a campo, lo que dice cada lado y si coinciden.
+
+    Se enseña **también cuando todo cuadra**, y ésa es la gracia. Un «sin
+    incidencias» sin decir qué se ha mirado no tranquiliza a nadie: lo que
+    tranquiliza es ver los cuatro campos comparados y que cuadran.
+    """
+    cuerpo = ""
+    for f in filas:
+        ok = f.get("coincide", True)
+        # Un campo que sólo consta en un documento NO lleva visto bueno: no se
+        # ha comparado. Pintarlo en verde diría que cuadra, y lo que pasa es que
+        # no se sabe — que es la distinción que sostiene todo este proyecto.
+        if not f.get("comparado", True):
+            marca, clase = "–", "c-nota"
+        else:
+            marca, clase = ("✓", "c-ok") if ok else ("✕", "c-no")
+        cuerpo += (
+            f'<tr class="{"" if ok else "f--no"}">'
+            f'<td>{_e(f["campo"])}</td>'
+            f'<td>{_e(f.get("cliente", "—"))}</td>'
+            f'<td>{_e(f.get("orden", "—"))}</td>'
+            f'<td class="{clase}" style="text-align:center">{marca}</td>'
+            f'<td class="c-nota">{_e(f.get("nota", ""))}</td></tr>')
+    st.markdown(
+        '<table class="cotejo"><thead><tr><th>Campo</th>'
+        '<th>Dice el cliente</th><th>Dice la orden</th><th></th>'
+        '<th></th></tr></thead>'
+        f'<tbody>{cuerpo}</tbody></table>', unsafe_allow_html=True)
+
+
+def cuadros_herramientas(cuadros):
+    """
+    Las tres herramientas del equipo, cada una con lo que sabe de este caso.
+
+    El que le corresponde a la incidencia va destacado y trae **los datos
+    dentro**: no un enlace a otra pantalla, sino la discrepancia con sus dos
+    cifras. Los otros dos no se ocultan — verlos es lo que hace entender que
+    esto es un centro de control y no una herramienta suelta.
+    """
+    trozos = []
+    for c in cuadros:
+        activo = c.get("activo")
+        contenido = ""
+        if c.get("lineas"):
+            filas = "".join(
+                f'<div class="l"><span>{_e(k)}</span>'
+                f'<b class="{"mal" if destacar else ""}">{_e(v)}</b></div>'
+                for k, v, destacar in c["lineas"])
+            contenido = f'<div class="q-c">{filas}</div>'
+        veredicto = (f'<div class="q-v">{_texto(c["veredicto"])}</div>'
+                     if c.get("veredicto") else "")
+        trozos.append(
+            f'<div class="cuadro {"cuadro--activo" if activo else ""}">'
+            f'<div class="q-e">{_e(c.get("estado", "No aplica a este caso"))}</div>'
+            f'<div class="q-n">{_e(c["nombre"])}</div>'
+            f'<div class="q-m">{_e(c.get("modulo", ""))}</div>'
+            f'<div class="q-d">{_e(c["descripcion"])}</div>'
+            f'{contenido}{veredicto}</div>')
+    st.markdown(f'<div class="cuadros">{"".join(trozos)}</div>',
+                unsafe_allow_html=True)
 
 
 GLIFO_ESTADO = {"limpio": "✓", "incidencia": "✕", "incompleto": "◌",

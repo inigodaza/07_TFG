@@ -413,6 +413,119 @@ def diagnostico(alarma, discrepancia=None):
     }
 
 
+# Los pasos que da el sistema al auditar una tanda. Están aquí, enumerados,
+# porque cada uno ocurre de verdad: no es una barra de progreso decorativa.
+PASOS_AUDITORIA = [
+    ("Leyendo los documentos", "capa de texto del PDF, u OCR si no la tiene"),
+    ("Reconociendo de qué tipo es cada uno",
+     "por señales del contenido, no por el nombre del fichero"),
+    ("Extrayendo los campos", "cantidad, páginas, gramajes, ISBN y formato"),
+    ("Agrupando por pedido", "usando el ISBN, que es lo que de verdad los une"),
+    ("Contrastando cada pedido consigo mismo",
+     "campo a campo, entre la orden y la documentación de cliente"),
+]
+
+
+def cotejo(resultado):
+    """
+    Campo a campo, qué dice cada lado del pedido y si coinciden.
+
+    Sirve igual cuando hay incongruencia y cuando no, y esto último es lo que
+    faltaba: un «sin incidencias» que no dice qué se ha mirado no tranquiliza a
+    nadie. Lo que tranquiliza es ver los campos comparados.
+    """
+    ctx = resultado.get("contexto") or {}
+    cliente, orden = ctx.get("cliente") or {}, ctx.get("orden") or {}
+    rangos = cliente.get("rangos") or {}
+    discrepantes = {d["campo"] for d in resultado.get("discrepancias") or []}
+
+    filas = []
+    for clave, (etiqueta, _sev) in auditoria.CAMPOS.items():
+        a, b = cliente.get(clave), orden.get(clave)
+        if a is None and b is None:
+            continue
+        nota = ""
+        if a is None or b is None:
+            # Que falte un lado no es que coincida: es que no se ha podido
+            # comparar, y decirlo es la mitad del valor de esta tabla.
+            coincide = None
+            nota = ("sólo consta en la orden" if a is None
+                    else "sólo consta en la documentación de cliente")
+        elif clave in rangos:
+            coincide = clave not in discrepantes
+            nota = ("dentro de la horquilla que pide el cliente" if coincide
+                    else "fuera de la horquilla")
+        else:
+            coincide = clave not in discrepantes
+        filas.append({"campo": etiqueta,
+                      "cliente": "—" if a is None else a,
+                      "orden": "—" if b is None else b,
+                      "coincide": coincide is not False,
+                      "comparado": coincide is not None,
+                      "nota": nota})
+    return filas
+
+
+def cuadros_del_caso(alarma_o_resultado, estado, con_incidencia=True):
+    """
+    Lo que cada una de las tres herramientas sabe de este caso.
+
+    Es el panel que pide Fabián: un centro de control, no seis aplicaciones. La
+    que le corresponde a la incidencia trae **los datos dentro** —la
+    discrepancia con sus dos cifras— y las otras dos dicen qué harían y por qué
+    no aplican aquí. Verlas apagadas es lo que hace entender que había dónde
+    elegir y que eligió el sistema.
+    """
+    r = alarma_o_resultado
+    a1, a2, a3 = ANALISIS
+
+    lineas = []
+    if con_incidencia and r.get("principal"):
+        p = r["principal"]
+        lineas = [
+            ("Pedido", r.get("etiqueta", ""), False),
+            (f'{p["etiqueta"]} · cliente', str(p["valor_cliente"]), False),
+            (f'{p["etiqueta"]} · orden', str(p["valor_orden"]), True),
+        ]
+        if len(r.get("discrepancias") or []) > 1:
+            lineas.append(("Otras diferencias",
+                           str(len(r["discrepancias"]) - 1), False))
+
+    dil = analisis_diligencia(estado.get("contratos") or [])
+    if dil["aplica"]:
+        d = dil["documentos"][0]
+        v_dil = (f'Contrato **{d["etiqueta"].lower()}**'
+                 + (f', quedan {d["dias"]} días' if d["dias"] is not None else "")
+                 + ".")
+    else:
+        v_dil = "No hay documentación contractual en este expediente."
+
+    return [
+        {"id": a1["id"], "nombre": a1["nombre"], "modulo": a1["modulo"],
+         "descripcion": "Compara la orden de fabricación con la documentación "
+                        "de cliente del mismo pedido y señala en qué campo "
+                        "exactamente no coinciden.",
+         "activo": con_incidencia,
+         "estado": "Le corresponde" if con_incidencia else "Sin incidencias",
+         "lineas": lineas,
+         "veredicto": (None if con_incidencia else
+                       "Los documentos de este pedido dicen lo mismo.")},
+        {"id": a2["id"], "nombre": a2["nombre"], "modulo": a2["modulo"],
+         "descripcion": "Sitúa en el tiempo los contratos y anexos del cliente: "
+                        "si están en vigor, cuándo vencen y con cuánto preaviso "
+                        "hay que denunciarlos.",
+         "activo": False, "estado": "Consultable",
+         "veredicto": v_dil},
+        {"id": a3["id"], "nombre": a3["nombre"], "modulo": a3["modulo"],
+         "descripcion": "Busca en el histórico trabajos parecidos al que se "
+                        "acaba de encargar, para reaprovechar lo que ya se "
+                        "hizo y no presupuestar dos veces lo mismo.",
+         "activo": False, "estado": "No puede contestar",
+         "veredicto": "Su histórico es de otro dominio —equipos industriales, "
+                      "no libros—, así que **no contesta sobre este pedido**."},
+    ]
+
+
 def analisis_incongruencias(alarma, respuesta_modulo=""):
     """Herramienta 1 — el detalle de la discrepancia, contrastado y con citas."""
     from . import caso

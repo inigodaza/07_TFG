@@ -3173,7 +3173,98 @@ comprobar(_CASO.numero_de_pedido({"pedido": "sin_numero"}) is None,
           "…y cuando no lo lleva no se inventa uno: pedir «la exportación del "
           "pedido sin_numero» sería una petición inatendible")
 
-print("\n36 · Proponer no es validar: los dos escalones de la cadena")
+print("\n36 · Leer lo que el cliente escribió, no lo que esperábamos")
+# Los cuatro hallazgos salieron de meter en el sistema documentación real de dos
+# clientes —Editions du Seuil y Cambridge University Press— el 12/09. Los textos
+# de aquí abajo reproducen sólo los patrones; los documentos NO se versionan, por
+# lo mismo que los de Juan: son de cliente.
+
+_FR = """Bon de commande n°JAR-SEU-00047554-003
+ Tirage :                 5 000 ex.
+ Pagination :             240 pages
+ Format bloc texte :      170 x 240 mm
+ EAN :                    9782021621099
+ Composants d'impression
+ Intérieur   offset sans bois standard
+ 240 pages   120g
+ Couverture  Qualité : Wibalin Flexcover
+             265g
+"""
+comprobar(A.clasificar(_FR) == "pedido_cliente",
+          "El bon de commande francés se reconoce como lo que es: el cliente "
+          "encargando. Antes caía en «desconocido» y se quedaba fuera de la "
+          "comparación EN SILENCIO — que no es «no hay incongruencias», es «no "
+          "sé leer la mitad del caso»", A.clasificar(_FR))
+_cfr = A.campos_cliente(_FR)
+comprobar(_cfr.get("cantidad") == 5000 and _cfr.get("paginas") == 240
+          and _cfr.get("isbn") == "9782021621099"
+          and _cfr.get("gramaje_interior") == 120
+          and _cfr.get("gramaje_cubierta") == 265,
+          "…y se le leen los seis campos, con el espacio fino de millar de "
+          "«5 000 ex.» y los gramajes dentro de la tabla de componentes",
+          str({k: v for k, v in _cfr.items() if k != "rangos"}))
+
+_RANGO = """Purchase Order
+        Extent: 128pp text + 4pp cover.
+        Cover: 240-260gsm C1S Cover Board
+        TEXT: 80gsm Uncoated Coral Book White
+"""
+_cr = A.campos_cliente(_RANGO)
+comprobar(_cr["rangos"].get("gramaje_cubierta") == (240, 260)
+          and _cr["gramaje_cubierta"] == "240-260",
+          "Un RANGO no es un valor: «240-260gsm» se guarda como horquilla y se "
+          "enseña entera. Quedarse con el 260 del final sería inventarse una "
+          "exigencia que el documento no hace", str(_cr.get("gramaje_cubierta")))
+
+_docs_rango = [
+    {"nombre": "po.pdf", "id": "po", "tipo": "pedido_cliente", "texto": _RANGO},
+    {"nombre": "of.pdf", "id": "of", "tipo": "orden", "texto":
+     "Orden de Fabricacion\nCantidad:\n  Titulo   2.500 128\n"
+     "  Carton   170x240   250  Cubiertas  4/0\n"},
+]
+_esp_r, _ = A.verdad_de_campo(_docs_rango)
+comprobar(not [e for e in _esp_r if e["campo"] == "gramaje_cubierta"],
+          "Y 250 dentro de 240-260 NO es una incongruencia. Un falso positivo es "
+          "el fallo más caro de este sistema: si avisa de lo que está bien, se "
+          "dejan de mirar los avisos y tampoco se ve el que importaba",
+          str([(e["campo"], e["valor_cliente"], e["valor_orden"]) for e in _esp_r]))
+
+_PACK = """Purchase Order
+       This Pack contains Workbook L5- 9781108909327 & Super Practice Book
+       ********** SPECIFICATION OF WORKBOOK - 9781108909327 **************
+        Trim Size: 276 x 219mm Portrait with bleed.
+        Extent: 128pp text + 4pp cover.
+        TEXT: 80gsm Uncoated
+       ***************** SPECIFICATION OF PRACTICE BOOK- 9781108821940 ****
+        Trim Size: 210 x 297mm
+        Extent: 64pp text
+        TEXT: 100gsm Coated
+"""
+comprobar(A.campos_cliente(_PACK, "9781108909327").get("paginas") == 128
+          and A.campos_cliente(_PACK, "9781108821940").get("paginas") == 64,
+          "Una orden de compra puede cubrir VARIOS libros, cada uno con su "
+          "especificación. Se recorta la del libro que fabrica esta orden: leer "
+          "el documento entero compara contra el libro equivocado")
+comprobar(A.campos_cliente(_PACK).get("paginas") == 128,
+          "…y si no se sabe cuál es, se lee entero. Perder precisión es "
+          "aceptable; inventársela no")
+
+from demo import flujo as _FL2
+_d_pack = {"nombre": "po.pdf", "tipo": "pedido_cliente", "texto": _PACK}
+_d_of = {"nombre": "of.pdf", "tipo": "orden",
+         "texto": "Orden de Fabricacion\nISBN: 978-1-108-90932-7\n"}
+comprobar("9781108909327" in _FL2.referencias(_d_pack),
+          "Un documento puede citar varios ISBN y se recogen todos: el del pack "
+          "y los de los libros que contiene")
+comprobar(_FL2.referencias(_d_of) == ["9781108909327"],
+          "El ISBN con guiones es el mismo número: «978-1-108-90932-7» → "
+          "9781108909327", str(_FL2.referencias(_d_of)))
+comprobar(len(_FL2.agrupar([_d_pack, _d_of])) == 1,
+          "Y por eso los dos documentos caen en el MISMO pedido. Agrupando por "
+          "el primer ISBN de cada uno caían en grupos distintos y el sistema "
+          "decía «falta la orden» teniéndola delante")
+
+print("\n37 · Proponer no es validar: los dos escalones de la cadena")
 # La regla la confirmó Íñigo mirando el vídeo del módulo: hay que estar en el
 # área para proponer y mandar sobre ella para validar. Se comprueba aquí porque
 # es una regla con la que se juzga el trabajo de otra persona, y una regla así no
@@ -3236,7 +3327,7 @@ if _AUT.cargar():
               "puede tocarlo bajo la otra. Cambiar la lectura cambia el "
               "veredicto, y por eso falta el mapa de Pablo")
 
-print("\n37 · Los cuatro estados se ven distintos")
+print("\n38 · Los cuatro estados se ven distintos")
 # El color de esta aplicación es información, así que se comprueba como
 # información. Lo que se fija aquí no es el tono exacto —eso puede afinarse—
 # sino las tres reglas de las que depende que la pantalla cuente lo mismo que

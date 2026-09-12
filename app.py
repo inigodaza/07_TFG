@@ -110,6 +110,7 @@ PIEZAS = [
                    "sesion_iniciada", "cadena_de_custodia", "barra_pasos",
                    "bandeja", "aviso_incidencia", "enfrentar",
                    "rejilla_herramientas", "consulta_pedido", "recibo",
+                   "auditando", "cotejo", "cuadros_herramientas",
                    "barra_consola", "tarjeta_alarma", "naturaleza",
                    "ficha_sesion", "evidencia_enfrentada",
                    "registro_criterio",
@@ -135,7 +136,8 @@ PIEZAS = [
                                   "acciones_para", "actuar",
                                   "analisis_incongruencias",
                                   "analisis_diligencia",
-                                  "analisis_similitud", "ANALISIS",
+                                  "analisis_similitud", "ANALISIS", "cotejo",
+                                  "cuadros_del_caso", "PASOS_AUDITORIA",
                                   "diagnostico", "fragmento_de",
                                   "contexto_del_caso"]),
     ("nucleo/memoria.py", memoria, ["registrar", "precedentes",
@@ -348,44 +350,15 @@ def _miles(x):
 
 
 def _consola_docs():
-    """La bandeja: la de ejemplo, o la que se suba."""
-    # En la barra lateral, no en la pantalla: de dónde salen los documentos es
-    # configuración, y en un producto la configuración no ocupa el primer sitio
-    # que ve el operario.
-    with st.sidebar:
-        st.markdown("---")
-        st.markdown("**Origen de los documentos**")
-        fuente = st.radio(
-            "Origen", ["Bandeja de ejemplo", "Subir los míos"],
-            horizontal=True, label_visibility="collapsed", key="consola_fuente")
-        if fuente == "Bandeja de ejemplo":
-            st.caption("Tres pedidos y un contrato marco, inventados de "
-                       "principio a fin y marcados como tales. Uno de los "
-                       "pedidos cuadra y dos no, y los dos que no llevan el "
-                       "mismo error: es lo que permite ver la memoria "
-                       "funcionando.")
-            docs = guion.documentos_de("ejemplo")
-            if not docs:
-                st.error("No hay documentos de ejemplo. Genéralos con "
-                         "`python demo/generar_ejemplo.py`.")
-                st.stop()
-            return docs
+    """
+    La bandeja de ejemplo, que es lo único que vive en el repositorio.
 
-        subidos = st.file_uploader(
-            "Documentos en PDF", type=["pdf", "txt"],
-            accept_multiple_files=True, key="consola_up")
-        if not subidos:
-            st.info("Sube órdenes de fabricación, documentación de cliente y, "
-                    "si los hay, contratos. El sistema los reparte solo.")
-            st.stop()
-        firmas = tuple((f.name, hash(f.getvalue())) for f in subidos)
-        memo = st.session_state.setdefault("_consola_leidos", {})
-        if firmas not in memo:
-            with st.spinner("Leyendo…"):
-                with tempfile.TemporaryDirectory() as tmp:
-                    memo.clear()
-                    memo[firmas] = P.leer_subidos(subidos, tmp, ocr=P.hay_ocr())
-        return [d for d in memo[firmas] if not d.get("huerfano")]
+    Los documentos reales de los pedidos son documentación de cliente y **no se
+    versionan**: entran por la pantalla de recepción, en la máquina de quien hace
+    la demostración, y no dejan copia en GitHub. Es la misma disciplina que con
+    los documentos de Juan, y no cambia porque ahora sean más bonitos.
+    """
+    return guion.documentos_de("ejemplo")
 
 
 def _herramientas(alarma, estado):
@@ -535,8 +508,9 @@ def pantalla_consola():
     # ahí al abrir, no se ve de dónde sale.
     todos_lotes = consola.lotes(docs)
     recibidos = st.session_state.setdefault("consola_recibidos", set())
-    entrados = [d for lote, ds in todos_lotes.items() if lote in recibidos
-                for d in ds]
+    entrados = ([d for lote, ds in todos_lotes.items() if lote in recibidos
+                 for d in ds]
+                + st.session_state.get("consola_subidos", []))
     estado = consola.arrancar(entrados, auditoria.clasificar)
     resueltas = st.session_state.setdefault("consola_resueltas", set())
     abiertas = [a for a in estado["alarmas"] if a["etiqueta"] not in resueltas]
@@ -585,16 +559,18 @@ def pantalla_consola():
 
     # --------------------------------------------- 2 · RECEPCIÓN Y PROCESAMIENTO
     #
-    # La pantalla 2 del guion, y la que faltaba para que la demo se creyera. Una
-    # alarma que ya está ahí cuando abres la aplicación no enseña de dónde sale;
-    # hay que ver entrar los documentos y ver al sistema pararse en uno.
+    # La pantalla 2 del guion, y la que hace creíble todo lo demás. Una alarma
+    # que ya está ahí cuando abres la aplicación no enseña de dónde sale; hay que
+    # ver entrar los documentos y ver al sistema pararse en uno.
     #
     # Se puede volver aquí en cualquier momento y meter más: eso es lo que hace
-    # que parezca un sistema en marcha y no un guion. En la demostración vale la
-    # pena guardarse un lote para el final y verlo levantar una alarma en vivo.
+    # que parezca un sistema en marcha y no un guion. En la demostración conviene
+    # empezar por un pedido que cuadra —para que se vea que el sistema
+    # distingue— y meter después el que no.
     pendientes = {k: v for k, v in todos_lotes.items() if k not in recibidos}
 
-    if st.session_state.get("consola_pantalla") == "recepcion" or not recibidos:
+    if (st.session_state.get("consola_pantalla") == "recepcion"
+            or not (recibidos or st.session_state.get("consola_subidos"))):
         st.markdown(
             '<div class="hero"><div class="eyebrow">GraphyCems · recepción</div>'
             '<h1>Entrada de documentación</h1>'
@@ -604,97 +580,128 @@ def pantalla_consola():
             unsafe_allow_html=True)
         ui.naturaleza(naturaleza.capas_de("procesamiento"))
 
-        if recibidos:
-            st.caption(f'Ya procesados: {", ".join(sorted(recibidos))}. '
-                       f'{estado["pedidos"]} pedido(s) analizados, '
+        if recibidos or st.session_state.get("consola_subidos"):
+            st.caption(f'Ya auditados: {estado["pedidos"]} pedido(s), '
+                       f'{len(estado["limpios"])} sin incidencias y '
                        f'{len(abiertas)} alarma(s) abierta(s).')
 
-        if not pendientes:
-            st.success("No queda documentación por recibir. Todo lo que había "
-                       "en la bandeja está procesado.")
-            st.button("Ir a la consola", type="primary", key="rec_ir",
-                      on_click=lambda: st.session_state.update(
-                          consola_pantalla="consola"))
-            return
+        nuevos = []
+        origen = None
 
-        st.markdown("**Tandas en espera**")
-        elegidos = []
-        for lote, ds in pendientes.items():
-            etiqueta = (f'{lote} — {len(ds)} documento(s)'
-                        if lote != "expediente" else
-                        f'{lote} — contrato marco del cliente')
-            if st.checkbox(etiqueta, value=True, key=f"rec_{lote}"):
-                elegidos.append(lote)
-        st.caption("Puedes dejar alguna sin recibir y meterla después: la "
-                   "alarma saltará entonces, delante de quien esté mirando.")
+        st.markdown("**Añadir documentos**")
+        st.caption("La orden de fabricación y la documentación de cliente del "
+                   "mismo pedido. Se pueden soltar de dos en dos, que es como "
+                   "llegan.")
+        subidos = st.file_uploader(
+            "Documentos en PDF", type=["pdf", "txt"],
+            accept_multiple_files=True, key=f'up_{st.session_state.get("up_n", 0)}',
+            label_visibility="collapsed")
+        if subidos and st.button("Auditar documentos", type="primary",
+                                 key="rec_auditar"):
+            with tempfile.TemporaryDirectory() as tmp:
+                nuevos = [d for d in P.leer_subidos(subidos, tmp, ocr=P.hay_ocr())
+                          if not d.get("huerfano")]
+            origen = "subidos"
 
-        if not st.button("Recibir y procesar", type="primary", key="rec_procesar"):
-            if recibidos:
+        if pendientes:
+            with st.expander(f'…o usar la bandeja de ejemplo '
+                             f'({len(pendientes)} tanda(s) en espera)'):
+                st.caption("Documentos inventados de principio a fin y marcados "
+                           "como tales. Sirven para recorrer la consola sin "
+                           "depender de documentación de cliente.")
+                elegidos = []
+                for lote, ds in pendientes.items():
+                    etiqueta = (f'{lote} — {len(ds)} documento(s)'
+                                if lote != "expediente" else
+                                f'{lote} — contrato marco del cliente')
+                    if st.checkbox(etiqueta, value=False, key=f"rec_{lote}"):
+                        elegidos.append(lote)
+                if elegidos and st.button("Auditar la selección",
+                                          key="rec_procesar"):
+                    nuevos = [d for l in elegidos for d in todos_lotes[l]]
+                    origen = set(elegidos)
+
+        if not nuevos:
+            if recibidos or st.session_state.get("consola_subidos"):
                 st.button("Volver a la consola", key="rec_volver",
                           on_click=lambda: st.session_state.update(
                               consola_pantalla="consola"))
-            return
-        if not elegidos:
-            st.warning("Marca al menos una tanda.")
+            else:
+                st.info("Sube los documentos de un pedido para empezar.")
             return
 
-        # Se pintan de una en una, con una pausa corta. No es adorno: lo que hay
-        # que ver es que el sistema **va leyendo** y que se para en un sitio
-        # concreto. Una tabla que aparece entera cuenta el resultado, no el
-        # trabajo.
-        nuevas = 0
+        # --- «Auditando documentos…»
+        #
+        # Los pasos se pintan de uno en uno con una pausa corta. Cada uno ocurre
+        # de verdad; la pausa sólo los hace visibles. Un resultado que aparece
+        # instantáneo parece una constante escrita a mano, y lo que hay que
+        # entender es que detrás hay trabajo.
         hueco = st.empty()
-        pintado = []
-        for lote in elegidos:
-            del_lote = todos_lotes[lote]
-            paso = consola.arrancar(del_lote, auditoria.clasificar)
-            for r in paso["resultados"]:
-                pintado.append((lote, r))
-            if paso["contratos"]:
-                pintado.append((lote, {
-                    "etiqueta": "Documentación contractual",
-                    "estado": "contrato",
-                    "documentos": [{"nombre": c["doc"]["nombre"],
-                                    "tipo": "contrato"}
-                                   for c in paso["contratos"]],
-                }))
-            nuevas += len(paso["alarmas"])
-
+        for i in range(len(consola.PASOS_AUDITORIA)):
             with hueco.container():
-                for _l, r in pintado:
-                    filas = [{
-                        "nombre": d["nombre"], "tipo": d["tipo"],
-                        "estado": "leído",
-                        "dispara": r["estado"] == "incidencia"
-                        and d["tipo"] == "orden",
-                    } for d in r["documentos"]]
-                    ui.recibo(f'Tanda {_l} · {r.get("etiqueta", "")}', filas,
-                              estado=r["estado"])
-                    if r["estado"] == "limpio":
-                        st.success(f'{r["etiqueta"]}: los documentos dicen lo '
-                                   f'mismo. Sin incidencias.')
-                    elif r["estado"] == "incidencia":
-                        p_ = r["discrepancias"][0]
-                        st.error(f'**Posible incongruencia · {r["etiqueta"]}** — '
-                                 f'{p_["etiqueta"]}: '
-                                 f'{_miles(p_["valor_cliente"])} contra '
-                                 f'{_miles(p_["valor_orden"])}. '
-                                 f'{len(r["discrepancias"])} diferencia(s) en '
-                                 f'total.')
-                    elif r["estado"] == "contrato":
-                        ui.nota("Documentación contractual: no pertenece a "
-                                "ningún pedido. Queda en el expediente del "
-                                "cliente y la usa la herramienta de "
-                                "diligencia.", tono="espera")
-                    else:
-                        ui.nota(f'{r["etiqueta"]}: no se puede contrastar '
-                                f'todavía. {r.get("motivo", "")}', tono="espera")
-            time.sleep(0.5)
+                ui.auditando(consola.PASOS_AUDITORIA, i)
+            time.sleep(0.75)
 
-        st.session_state.consola_recibidos = recibidos | set(elegidos)
+        nuevos, avisos_n = clasificacion.anotar_tipos(
+            nuevos, auditoria.clasificar, auditoria.TIPOS, "determinista",
+            permiso=llm.permiso_de(auditoria.FICHA))
+        paso = consola.arrancar(nuevos, auditoria.clasificar)
+        with hueco.container():
+            ui.auditando(consola.PASOS_AUDITORIA, len(consola.PASOS_AUDITORIA))
+
+        for a in avisos_n:
+            st.info(a)
+
+        # --- El resultado, pedido a pedido
+        for r in paso["resultados"]:
+            filas = [{"nombre": d["nombre"], "tipo": d["tipo"],
+                      "estado": "leído",
+                      "dispara": r["estado"] == "incidencia" and d["tipo"] == "orden"}
+                     for d in r["documentos"]]
+            ui.recibo(f'Pedido {r["etiqueta"]}', filas, estado=r["estado"])
+
+            if r["estado"] == "incompleto":
+                ui.nota(f'<b>No se puede contrastar todavía.</b> {r["motivo"]}',
+                        tono="espera")
+                continue
+
+            # Lo leído, campo a campo — también cuando todo cuadra. Un «sin
+            # incidencias» que no dice qué se ha mirado no tranquiliza a nadie.
+            st.markdown("**Lo que ha leído de cada documento**")
+            ui.cotejo(consola.cotejo(r))
+            comparados = sum(1 for f in consola.cotejo(r) if f["comparado"])
+
+            if r["estado"] == "limpio":
+                st.success(f'**Pedido {r["etiqueta"]}: todo correcto.** '
+                           f'{comparados} campo(s) comparados entre la orden y '
+                           f'la documentación de cliente, y coinciden todos. No '
+                           f'hace falta que lo mire nadie.')
+            else:
+                p_ = r["discrepancias"][0]
+                st.error(f'**Posible incongruencia · pedido {r["etiqueta"]}** — '
+                         f'{p_["etiqueta"]}: {_miles(p_["valor_cliente"])} '
+                         f'contra {_miles(p_["valor_orden"])}. '
+                         f'{len(r["discrepancias"])} diferencia(s) sobre '
+                         f'{comparados} campo(s) comparados.')
+
+        if paso["contratos"]:
+            ui.nota(f'<b>{len(paso["contratos"])} documento(s) contractual(es)</b> '
+                    f'— no pertenecen a ningún pedido. Quedan en el expediente '
+                    f'del cliente y los usa la herramienta de diligencia.',
+                    tono="espera")
+
+        # Se guarda lo auditado para que la consola lo tenga.
+        if origen == "subidos":
+            st.session_state.consola_subidos = (
+                st.session_state.get("consola_subidos", []) + nuevos)
+            st.session_state.up_n = st.session_state.get("up_n", 0) + 1
+        elif origen:
+            st.session_state.consola_recibidos = recibidos | origen
         st.session_state.consola_pantalla = "consola"
-        if nuevas:
-            st.button(f'Atender {nuevas} alarma(s)', type="primary",
+
+        n_alarmas = len(paso["alarmas"])
+        if n_alarmas:
+            st.button(f'Atender {n_alarmas} alarma(s)', type="primary",
                       key="rec_alarmas")
         else:
             st.button("Ir a la consola", type="primary", key="rec_sin")
@@ -716,13 +723,11 @@ def pantalla_consola():
     # Se puede volver a recepción en cualquier momento. Es lo que convierte la
     # demo en un sistema: metes otra tanda y la alarma salta delante de quien
     # está mirando, en vez de haber estado ahí desde el principio.
-    if pendientes:
-        c_rec, _ = st.columns([2, 3])
-        if c_rec.button(f'Entra más documentación ({len(pendientes)} tanda(s) '
-                        f'en espera)', use_container_width=True,
-                        key="ir_recepcion"):
-            st.session_state.consola_pantalla = "recepcion"
-            st.rerun()
+    c_rec, _ = st.columns([2, 3])
+    if c_rec.button("Entra más documentación", use_container_width=True,
+                    key="ir_recepcion"):
+        st.session_state.consola_pantalla = "recepcion"
+        st.rerun()
     for a in avisos:
         st.info(a)
 
@@ -762,6 +767,7 @@ def pantalla_consola():
             if st.button(f'Atender la alarma del pedido {a["etiqueta"]}',
                          key=f'atender_{a["etiqueta"]}', type="primary"):
                 st.session_state.consola_alarma = a["etiqueta"]
+                st.session_state.pop("consola_vista", None)
                 st.rerun()
 
         if estado["limpios"]:
@@ -802,7 +808,30 @@ def pantalla_consola():
 
     if st.button("← Volver a la cola", key="consola_volver"):
         st.session_state.consola_alarma = None
+        st.session_state.pop("consola_vista", None)
         st.rerun()
+
+    # ------------------------------------------- 4 · EL PANEL DE HERRAMIENTAS
+    #
+    # Atender una alarma no lleva directamente al detalle: lleva al panel. Ver
+    # las tres herramientas juntas —y ver que dos de ellas no aplican a este
+    # caso— es lo que hace entender la frase de Fabián: «tengo un centro de
+    # control único, no seis aplicaciones independientes».
+    if st.session_state.get("consola_vista") != "detalle" and not ya_cerrada:
+        st.markdown(f'### Panel de la incidencia · pedido {alarma["etiqueta"]}')
+        ui.naturaleza(naturaleza.capas_de("panel"))
+        st.caption("Las tres herramientas del equipo, con lo que cada una sabe "
+                   "de este caso. El sistema ya ha elegido cuál le corresponde.")
+        ui.cuadros_herramientas(consola.cuadros_del_caso(alarma, estado))
+        c1, c2 = st.columns([2, 3])
+        if c1.button("Abrir Auditoría de pedidos", type="primary",
+                     use_container_width=True, key="abrir_auditoria"):
+            st.session_state.consola_vista = "detalle"
+            st.rerun()
+        c2.caption("Es la que le corresponde a esta incidencia: una discrepancia "
+                   "entre la orden de fabricación y la documentación de cliente "
+                   "del mismo pedido.")
+        return
 
     ui.naturaleza(naturaleza.capas_de("panel"), pie=False)
     ui.aviso_incidencia(
@@ -894,7 +923,8 @@ def pantalla_consola():
 
         st.button("← Volver a la cola", key="consola_volver_pie",
                   type="primary",
-                  on_click=lambda: st.session_state.update(consola_alarma=None))
+                  on_click=lambda: st.session_state.update(
+                      consola_alarma=None, consola_vista=None))
         return
 
     st.markdown("#### Actuación")

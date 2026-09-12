@@ -82,9 +82,20 @@ def referencia(doc, clasificar=None):
     campos = (auditoria.campos_orden(doc["texto"]) if t == "orden"
               else auditoria.campos_cliente(doc["texto"]))
     if campos.get("isbn"):
-        return campos["isbn"]
-    m = re.search(r"\b(\d{13})\b", doc.get("texto") or "")
-    return m.group(1) if m else (doc.get("nombre") or "sin referencia")
+        return _isbn_normal(campos["isbn"])
+    # El mismo ISBN se imprime de dos maneras: «9782021621099» en un documento y
+    # «978-2-0216-2109-9» en el otro. Agrupar por la cadena tal cual dejaba los
+    # dos documentos del mismo pedido en grupos distintos, y entonces ninguno
+    # tenía con qué contrastarse: el sistema decía «falta la orden» teniéndola
+    # delante. Es el mismo número, y se compara como número.
+    m = re.search(r"\b(?:\d[-\s]?){12}\d\b", doc.get("texto") or "")
+    return (_isbn_normal(m.group(0)) if m
+            else (doc.get("nombre") or "sin referencia"))
+
+
+def _isbn_normal(v):
+    """Sin guiones ni espacios: «978-2-0216-2109-9» → «9782021621099»."""
+    return re.sub(r"[^\d]", "", str(v or "")) or str(v or "")
 
 
 def numero_de_orden(docs, clasificar=None):
@@ -107,11 +118,49 @@ def numero_de_orden(docs, clasificar=None):
     return None
 
 
+def referencias(doc, clasificar=None):
+    """
+    TODOS los ISBN que menciona un documento, no sólo el primero.
+
+    Lo descubrió el pedido de Cambridge: la orden de compra es de un **pack** y
+    cita tres ISBN —el del pack y los dos libros que contiene—, mientras que la
+    orden de fabricación es de uno solo de ellos. Agrupando por el primero que
+    aparece, los dos documentos del mismo trabajo caían en grupos distintos y el
+    sistema decía «falta la orden» teniéndola delante.
+
+    Se filtran por prefijo 978/979, que es lo que hace que un número de trece
+    cifras sea un ISBN y no una referencia cualquiera.
+    """
+    vistos, salida = set(), []
+    campos = auditoria.campos_orden(doc["texto"]) \
+        if _tipo(doc, clasificar) == "orden" \
+        else auditoria.campos_cliente(doc["texto"])
+    for bruto in [campos.get("isbn")] + re.findall(
+            r"\b(?:\d[-\s]?){12}\d\b", doc.get("texto") or ""):
+        n = _isbn_normal(bruto)
+        if n and n.startswith(("978", "979")) and n not in vistos:
+            vistos.add(n)
+            salida.append(n)
+    return salida
+
+
 def agrupar(docs, clasificar=None):
-    """Los documentos repartidos por pedido, conservando el orden de llegada."""
-    grupos = {}
+    """
+    Los documentos repartidos por pedido, conservando el orden de llegada.
+
+    Dos documentos van juntos si **comparten algún ISBN**, no si coinciden en el
+    primero. Es como lo haría una persona: mira si hablan del mismo libro.
+    """
+    grupos, claves = {}, {}
     for d in docs:
-        grupos.setdefault(referencia(d, clasificar), []).append(d)
+        refs = referencias(d, clasificar)
+        destino = next((claves[r] for r in refs if r in claves), None)
+        if destino is None:
+            destino = refs[0] if refs else (d.get("nombre") or "sin referencia")
+            grupos[destino] = []
+        for r in refs:
+            claves[r] = destino
+        grupos[destino].append(d)
     return grupos
 
 

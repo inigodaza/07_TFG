@@ -661,6 +661,44 @@ después: la alarma salta entonces, delante de quien esté mirando.
 Eso último es lo que distingue un sistema en marcha de un guion, y es lo que
 conviene guardarse para el final de la demostración.
 
+### Lo que enseñó la documentación real (12/09)
+
+Al meter en la consola documentación de dos clientes de verdad —Editions du
+Seuil y Cambridge University Press— salieron cuatro fallos de lectura, y los
+cuatro importan más que cualquier pantalla:
+
+**El bon de commande francés caía en «desconocido»** y se quedaba fuera de la
+comparación **en silencio**. El sistema habría dicho «sin incidencias» cuando lo
+que pasaba es que no sabía leer la mitad del caso. Ahora lo reconoce y le lee los
+seis campos: `Tirage`, `Pagination`, `EAN`, `Format bloc texte` y los dos
+gramajes, que viven dentro de la tabla de componentes y no en una línea
+«campo: valor».
+
+**Un rango no es un valor.** Cambridge pide la cubierta en «240-260gsm» y la
+orden pone 250: está dentro. El extractor se quedaba con el 260 del final y
+habría emitido una incongruencia **falsa** contra la fábrica. Un falso positivo
+es el fallo más caro que puede cometer este sistema: si avisa de lo que está
+bien, se dejan de mirar los avisos, y entonces tampoco se ve el que sí importaba.
+
+**Una orden de compra puede cubrir varios libros.** La de Cambridge es de un pack
+con dos especificaciones seguidas, cada una con su gramaje y su formato. Leer el
+documento entero comparaba la orden contra el libro equivocado; ahora se recorta
+el bloque del ISBN que fabrica esa orden.
+
+**El mismo ISBN se escribe de dos maneras**, y un documento cita varios.
+«9782021621099» y «978-2-0216-2109-9» son el mismo número, y la orden de compra
+del pack cita tres ISBN. Agrupando por el primero de cada documento, los dos
+papeles del mismo trabajo caían en grupos distintos y el sistema decía «falta la
+orden de fabricación» teniéndola delante.
+
+Con las cuatro correcciones, los dos pedidos reales salen **limpios y por el
+motivo correcto**: 4 y 5 campos comparados, ninguno discrepante.
+
+Los documentos **no se versionan**: son documentación de cliente, igual que los
+de Juan. Entran por la pantalla de recepción en la máquina de quien hace la
+demostración. Las comprobaciones de `pruebas.py` reproducen los patrones sobre
+texto sintético, para que se puedan ejecutar en cualquier sitio.
+
 ### La etiqueta «Naturaleza»
 
 Del customer journey de Fabián del 9/09. Cada pantalla declara qué capa la
@@ -714,7 +752,7 @@ la nada convierte una demostración en un folleto.
 ## 11 · Estado de comprobación
 
 ```
-python pruebas.py                →  602 comprobaciones en verde
+python pruebas.py                →  611 comprobaciones en verde
 python prueba_generalizacion.py  →   38 comprobaciones en verde
 python prueba_linea_hilo.py      →   genera la página y la deja mirable
 ```
