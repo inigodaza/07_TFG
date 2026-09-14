@@ -54,11 +54,31 @@ ANALISIS = [
      "pregunta": "¿Hemos hecho antes algo parecido?"},
 ]
 
-# Las tres cosas que puede hacer el operario con una alarma delante.
+# Lo que puede hacer el operario con una alarma delante.
+#
+# Son cuatro y no tres porque faltaba la más interesante. Con «aceptar el valor
+# del cliente» y «corregir» se pueden resolver los errores, pero no se puede
+# decir lo que un encargado dice diez veces al día: **«esto es tolerable, tira
+# para adelante»**. Una cubierta de 250 g donde el cliente pidió 240 no es un
+# error de nadie: es una diferencia que alguien con autoridad tolera. Sin esa
+# cuarta opción había que fingirla escribiendo 250 a mano en «corregir», y en
+# pantalla se leía como una corrección lo que era exactamente lo contrario.
 ACCIONES = {
     "aceptar": ("Aceptar el valor del cliente",
                 "Se da por buena la documentación de cliente y la orden se "
                 "corrige a ese valor."),
+    # «Tolerable» es la palabra de Juan, y por eso es la que se usa.
+    #
+    # Confirmado por él el 14 sep sobre este mismo caso —240 g contra 250 en
+    # cubierta—: «sí, en el vídeo creo que le doy a tolerable, y eso lo deja
+    # marcado; y si vuelve a salir ese mismo aviso en otro pedido sale como que
+    # es un fallo tolerable». Su módulo ya tiene el concepto y ya tiene la
+    # memoria. Poner aquí «dar por buena la orden» habría sido inventar
+    # vocabulario nuevo para algo que en GraphyCems ya se llama de una manera.
+    "dar_por_buena": ("Marcar como tolerable",
+                      "La diferencia no es un error que corregir: se fabrica con "
+                      "lo que dice la orden y queda constancia de quién la "
+                      "toleró."),
     "corregir": ("Corregir con otro valor",
                  "Ni uno ni otro: el operario fija el valor correcto y queda "
                  "registrado quién lo hizo."),
@@ -66,6 +86,72 @@ ACCIONES = {
                 "El operario no tiene autoridad sobre esta área, así que deja "
                 "constancia y la alarma sigue abierta."),
 }
+
+# Cómo llama el módulo de Juan a cada nivel de gravedad.
+#
+# Su salida sobre el pedido 42805 —el mismo caso que enseña la demo— no da una
+# lista de errores: da DOS categorías, «INCONGRUENCIA» y «A REVISAR», y mete el
+# gramaje en la segunda. Nuestra escala interna de severidad no cambia; lo que
+# cambia es cómo se rotula en pantalla, porque el nombre de una gravedad lo pone
+# quien audita y no quien evalúa.
+ETIQUETA_SEVERIDAD = {
+    "critica": "INCONGRUENCIA",
+    "alta": "INCONGRUENCIA",
+    "media": "A REVISAR",
+    "menor": "A REVISAR",
+}
+
+
+def etiqueta_severidad(discrepancia):
+    return ETIQUETA_SEVERIDAD.get(
+        (discrepancia.get("severidad_esperada") or "").lower(),
+        (discrepancia.get("severidad_esperada") or "—").upper())
+
+
+def nota_de_revision(discrepancia):
+    """
+    Por qué una diferencia sale «a revisar» y no como incongruencia.
+
+    La hipótesis del redondeo es de Juan, literal de la salida de su módulo
+    sobre el pedido 42805: «podría ser el redondeo estándar de GraphyCems, no
+    necesariamente un error». No la he deducido yo, y por eso se puede enseñar
+    sin asterisco. `None` cuando la diferencia no es de las pequeñas.
+    """
+    if (discrepancia.get("severidad_esperada") or "").lower() not in ("menor",
+                                                                     "media"):
+        return None
+    if "gramaje" in (discrepancia.get("campo") or ""):
+        return ("Podría ser el **redondeo estándar de GraphyCems**, no "
+                "necesariamente un error. Si es tolerable lo decide producción, "
+                "no el sistema.")
+    return ("Diferencia pequeña: puede no ser un error. Si es tolerable lo "
+            "decide quien manda sobre el área, no el sistema.")
+
+
+def etiqueta_accion(accion, ctx):
+    """
+    Cómo se llama el botón para QUIEN lo tiene delante.
+
+    Mencía lo dijo con estas palabras el 14 sep: «el encargado no puede
+    corregir; lo único que puede hacer es proponérselo al superior». Por dentro
+    el sistema ya hacía justo eso —su pulsación queda como propuesta y no cierra
+    nada— pero el botón le decía «Corregir con otro valor», que en su pantalla
+    es sencillamente falso. Un botón que nombra algo que quien lo pulsa no puede
+    hacer enseña mal el permiso justo donde más importa que se entienda.
+    """
+    etiqueta = ACCIONES[accion][0]
+    if accion == "escalar" or ctx.get("puede_validar"):
+        return etiqueta
+    return f"Proponer: {etiqueta[0].lower()}{etiqueta[1:]}"
+
+
+# Las dos que cierran ACEPTANDO la diferencia en vez de arreglarla.
+#
+# Importan aparte porque son las dos en las que tiene sentido preguntar si lo
+# decidido vale para la próxima: aceptar es decir «esta diferencia está bien», y
+# eso es lo que se puede generalizar. Corregir a un tercer valor es resolver un
+# caso concreto.
+ACEPTACIONES = ("aceptar", "dar_por_buena")
 
 
 # ---------------------------------------------------------------------------
@@ -124,10 +210,24 @@ def arrancar(docs, clasificar=None, modo="determinista"):
     alarmas, limpios, incompletos = [], [], []
     for r in resultados:
         if r["estado"] == "incidencia":
-            peor = sorted(r["discrepancias"],
-                          key=lambda d: flujo.ORDEN_SEVERIDAD.get(
-                              d.get("severidad_esperada"), 9))[0]
-            alarmas.append({**r, "principal": peor, "id": r["etiqueta"]})
+            # UNA INCONGRUENCIA, UNA ALARMA.
+            #
+            # Antes un pedido con dos diferencias producía una sola alarma: la
+            # más grave mandaba y el resto viajaba de paquete como «y 1
+            # diferencia menor». Eso obliga a resolverlas juntas, y es
+            # justamente lo que no se puede hacer: en el pedido 90002 la
+            # cantidad (3.000 contra 30.000) es un error que hay que corregir, y
+            # el gramaje de cubierta (240 contra 250) puede ser perfectamente
+            # asumible. Son dos decisiones distintas, de dos personas
+            # potencialmente distintas, y cada una deja su propio criterio.
+            #
+            # El pedido sigue siendo `etiqueta`, porque es lo que se enseña. Lo
+            # que cambia es que la clave única pasa a ser `id`, pedido + campo.
+            for d in sorted(r["discrepancias"],
+                            key=lambda x: flujo.ORDEN_SEVERIDAD.get(
+                                x.get("severidad_esperada"), 9)):
+                alarmas.append({**r, "principal": d, "discrepancias": [d],
+                                "id": f'{r["etiqueta"]}·{d["campo"]}'})
         elif r["estado"] == "limpio":
             limpios.append(r)
         else:
@@ -155,7 +255,7 @@ def categoria_de(alarma):
     return lecturas[0][0] if lecturas else None
 
 
-def contexto_operario(rol, alarma, onto=None):
+def contexto_operario(rol, alarma, onto=None, persona=None):
     """
     Quién es el operario, dónde está y qué le deja hacer ESTA alarma.
 
@@ -163,6 +263,13 @@ def contexto_operario(rol, alarma, onto=None):
     determina quién es el operario». No es una comprobación de permisos genérica:
     depende de la alarma que se tenga delante, porque la misma persona puede
     cerrar una y no poder tocar otra.
+
+    `persona` es quien ha iniciado sesión, y **no cambia ni un permiso**: la
+    autoridad la lleva el puesto, no el nombre. Sirve sólo para firmar. Hoy la
+    consola no la usa —se entra por puesto, no por persona— y el registro firma
+    con la fila de la matriz; el día que la empresa conecte su directorio, el
+    registro podrá guardar las dos cosas, que son las dos que hacen falta a los
+    seis meses: a quién preguntarle por qué, y con qué autoridad lo hizo.
     """
     onto = onto if onto is not None else AUT.cargar()
     cat = categoria_de(alarma)
@@ -172,6 +279,8 @@ def contexto_operario(rol, alarma, onto=None):
     proponer, motivo_p = AUT.puede(rol, cat, "proponer", onto)
     return {
         "rol": rol,
+        "persona": persona,
+        "quien": f"{persona} ({rol})" if persona else rol,
         "nivel": ficha["nivel"] if ficha else None,
         "area": ficha["area"] if ficha else None,
         "categoria": cat,
@@ -192,9 +301,9 @@ def acciones_para(ctx):
     pulsarlo es una forma cara de explicar los permisos.
     """
     if ctx["puede_validar"]:
-        return ["aceptar", "corregir"]
+        return ["aceptar", "dar_por_buena", "corregir"]
     if ctx["puede_proponer"]:
-        return ["aceptar", "corregir", "escalar"]
+        return ["aceptar", "dar_por_buena", "corregir", "escalar"]
     return ["escalar"]
 
 
@@ -225,14 +334,19 @@ def contexto_del_caso(alarma):
 
 
 def actuar(alarma, accion, ctx, valor=None, propuesta_previa=None,
-           justificacion=None, diagnostico_clave=None):
+           justificacion=None, diagnostico_clave=None, es_criterio=False):
     """
     El operario actúa. Devuelve qué ha pasado y si la alarma queda cerrada.
 
     La regla es la de siempre y no se duplica aquí: quien manda sobre el área
-    cierra, quien sólo está en ella propone. Lo que cambia es que ahora la
-    decisión, cuando se cierra, **se guarda** — y por eso la próxima incidencia
-    de la misma clase llegará con su precedente puesto.
+    cierra, quien sólo está en ella propone.
+
+    Todo lo que se cierra queda anotado —eso es el historial— y `es_criterio`
+    decide si además **vuelve** la próxima vez que aparezca una incidencia de la
+    misma clase. No lo decide el sistema: se le pregunta a quien cierra, y sólo
+    cuando la acción es una aceptación. Aceptar es decir «esta diferencia está
+    bien», y eso es lo que se puede generalizar; corregir a un tercer valor
+    resuelve un caso concreto y no dice nada de los siguientes.
     """
     principal = alarma["principal"]
 
@@ -249,39 +363,97 @@ def actuar(alarma, accion, ctx, valor=None, propuesta_previa=None,
                         "quedaría el número y nadie sabría por qué."),
         }
 
+    # Corregir sin decir a qué no es corregir.
+    #
+    # Va aquí, junto a la justificación y antes de los permisos, por el mismo
+    # motivo: son las dos formas de cerrar una alarma dejando el hueco donde
+    # debería estar la decisión. Antes se cerraba igual y el pedido acababa
+    # respondiendo «cantidad = », que es peor que no haberla atendido — la cola
+    # queda limpia y el dato, vacío.
+    if accion == "corregir" and not str(valor or "").strip():
+        return {
+            "cerrada": False, "accion": accion, "propuesta_por": None,
+            "falta_valor": True, "registro": None,
+            "mensaje": ("Falta el valor correcto. «Corregir» sin decir a qué "
+                        "cerraría la alarma dejando el pedido sin dato: "
+                        "escríbelo en «Corregir con otro valor», o acepta el "
+                        "valor del cliente si es el bueno."),
+        }
+
     if accion == "escalar" or not ctx["puede_validar"]:
+        # La propuesta TAMBIÉN se anota.
+        #
+        # Antes sólo quedaba en la pantalla del que validaba después. Eso deja
+        # fuera del registro justo lo que más cuesta reconstruir a los seis
+        # meses: que alguien miró la incidencia, dijo qué haría y por qué, y no
+        # pudo cerrarla. Trabajo que no consta es trabajo que no se hizo, y el
+        # encargado de turno es el que más veces está en esa situación.
+        registro = None
+        if ctx["puede_proponer"]:
+            registro = MEM.registrar(
+                principal, accion, None, alarma["etiqueta"],
+                propuesta_por=ctx["quien"],
+                justificacion=justificacion.strip(),
+                evidencias=[d["nombre"] for d in alarma.get("documentos") or []],
+                contexto=contexto_del_caso(alarma),
+                autorizados=ctx.get("manda") or [],
+                diagnostico=diagnostico_clave,
+                valor_decidido=(valor if accion == "corregir" else
+                                principal["valor_orden"]
+                                if accion == "dar_por_buena" else
+                                principal["valor_cliente"]
+                                if accion == "aceptar" else None),
+                fase="propuesta")
         return {
             "cerrada": False,
             "accion": accion,
-            "propuesta_por": ctx["rol"] if ctx["puede_proponer"] else None,
+            "propuesta_por": ctx["quien"] if ctx["puede_proponer"] else None,
             "justificacion": justificacion.strip(),
             "mensaje": (
-                f"Queda constancia de que {ctx['rol']} ha revisado la alarma, "
+                f"Queda constancia de que {ctx['quien']} ha revisado la alarma, "
                 f"pero **no se cierra**: sobre {ctx['area_afectada']} manda "
                 f"{', '.join(ctx['manda']) or 'nadie declarado'}."
                 if ctx["puede_proponer"] else
-                f"{ctx['rol']} no puede intervenir en esta alarma. {ctx['motivo']}."),
-            "registro": None,
+                f"{ctx['quien']} no puede intervenir en esta alarma. "
+                f"{ctx['motivo']}."),
+            "registro": registro,
         }
 
-    decidido = valor if accion == "corregir" else principal["valor_cliente"]
+    # Qué valor prevalece, según lo que se haya decidido.
+    decidido = {"aceptar": principal["valor_cliente"],
+                "dar_por_buena": principal["valor_orden"],
+                "corregir": valor}.get(accion, principal["valor_cliente"])
+    # Sólo una aceptación puede dejar criterio; una corrección, no (ver arriba).
+    criterio = bool(es_criterio) and accion in ACEPTACIONES
     diag = diagnostico(alarma) if diagnostico_clave is None else None
     registro = MEM.registrar(
-        principal, accion, ctx["rol"], alarma["etiqueta"],
+        principal, accion, ctx["quien"], alarma["etiqueta"],
         propuesta_por=propuesta_previa,
         justificacion=justificacion.strip(),
         evidencias=[d["nombre"] for d in alarma.get("documentos") or []],
         contexto=contexto_del_caso(alarma),
         autorizados=ctx.get("manda") or [],
-        diagnostico=diagnostico_clave or (diag or {}).get("clave"))
+        diagnostico=diagnostico_clave or (diag or {}).get("clave"),
+        es_criterio=criterio, valor_decidido=decidido)
+    cola = ((" Queda marcado como **fallo tolerable**: si vuelve a salir este "
+             "mismo aviso en otro pedido del mismo tipo de documento, saldrá ya "
+             "como tolerable."
+             if accion == "dar_por_buena" else
+             " Queda además como criterio: la próxima incidencia de esta clase "
+             "sobre el mismo tipo de documento llegará con esta decisión "
+             "puesta.")
+            if criterio else
+            " Queda como decisión de este caso, **no** como criterio: no se "
+            "propondrá en los siguientes.")
     return {
         "cerrada": True,
         "accion": accion,
         "valor": decidido,
+        "es_criterio": criterio,
         "propuesta_por": propuesta_previa,
-        "mensaje": (f"Alarma cerrada por {ctx['rol']}. El pedido "
+        "mensaje": (f"Alarma cerrada por {ctx['quien']}. El pedido "
                     f"{alarma['etiqueta']} responde ya con "
-                    f"{principal['etiqueta'].lower()} = {decidido}."),
+                    f"{principal['etiqueta'].lower()} = {decidido}." + cola),
         "registro": registro,
     }
 
@@ -520,9 +692,19 @@ def cuadros_del_caso(alarma_o_resultado, estado, con_incidencia=True):
          "descripcion": "Busca en el histórico trabajos parecidos al que se "
                         "acaba de encargar, para reaprovechar lo que ya se "
                         "hizo y no presupuestar dos veces lo mismo.",
-         "activo": False, "estado": "No puede contestar",
-         "veredicto": "Su histórico es de otro dominio —equipos industriales, "
-                      "no libros—, así que **no contesta sobre este pedido**."},
+         # «Pendiente de conectar», y no «no puede contestar».
+         #
+         # Dicen lo mismo de distinta manera y la diferencia importa en una
+         # demostración: «no puede contestar» suena a que el módulo de Álvaro
+         # falla, y no falla — lo que pasa es que su histórico es de otro
+         # dominio (equipos industriales, no libros) y todavía no está
+         # enchufado a este expediente. El matiz no es cosmético: aquí se está
+         # hablando del trabajo de un compañero delante de gente.
+         "activo": False, "estado": "Pendiente de conectar",
+         "veredicto": "Todavía no está enchufado a este expediente. El "
+                      "histórico disponible es de otro dominio —equipos "
+                      "industriales, no libros—, así que cuando se conecte "
+                      "hará falta también el histórico de artes gráficas."},
     ]
 
 

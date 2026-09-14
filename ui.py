@@ -24,7 +24,7 @@ import streamlit as st
 # viejo también tenía todas las funciones por nombre, la comprobación dio el
 # visto bueno. Lo que había cambiado era la **firma** de una de ellas, no su
 # existencia. Un número por fichero detecta lo que un `hasattr` no ve.
-VERSION_UI = 19
+VERSION_UI = 20
 
 from nucleo import bateria as B  # noqa: F401  (lo usa app.py)
 from nucleo import asesor as AS
@@ -435,6 +435,12 @@ div.stButton > button:disabled{ color:var(--tinta-3); }
 .alarma .al-t{ font-size:1.02rem; font-weight:650; color:var(--tinta);
                margin:.15rem 0 .1rem 0; }
 .alarma .al-d{ font-size:.85rem; color:var(--tinta-2); line-height:1.5; }
+/* «A revisar» NO es «incongruencia», y en la cola no puede salir del mismo rojo.
+   Una diferencia que el módulo de auditoría marca como posible redondeo y una
+   cantidad diez veces mayor pintadas igual le dicen al que mira que las dos son
+   lo mismo, y todo el recorrido de mañana consiste en que no lo son. */
+.alarma--revisar{ border-left-color:var(--espera-marca); }
+.alarma--revisar .al-p{ color:var(--espera); }
 
 /* Quién eres y qué puedes hacer con esta alarma */
 .ctx{
@@ -548,29 +554,114 @@ div.stButton > button:disabled{ color:var(--tinta-3); }
 .audit .a-d{ font-size:.78rem; color:var(--tinta-3); margin-left:1.7rem; }
 
 /* --- Los tres cuadros del panel ------------------------------------------ */
+/*
+   Los colores de este panel son IDENTIDAD, no veredicto.
+   ------------------------------------------------------
+   En el resto de la aplicación el color afirma algo —verde pasa, rojo no pasa,
+   azul pendiente— y por eso aquí hacen falta tres tonos que NO sean ninguno de
+   ésos y que no se usen nunca como fondo de la tarjeta: sólo banda superior,
+   icono y nombre del módulo. Así cada herramienta se reconoce a distancia sin
+   que el verde de similitud parezca decir «este análisis ha salido bien».
+
+   Lo que sí es un estado —«le corresponde», «pendiente de conectar»— sigue
+   viajando en la etiqueta de texto de arriba, que es lo que se lee en gris o en
+   negro y no depende de distinguir colores.
+*/
+:root{
+  /* Los tres pasan 4.5:1 sobre blanco y sobre su propio fondo, porque no sólo
+     pintan la banda: también escriben el rótulo del botón. El ámbar 600
+     (#d97706) y el esmeralda 600 (#059669) se quedaban en 3.2:1 y 3.8:1 —
+     suficiente para una línea de color, no para una palabra proyectada. */
+  --mod-auditoria:#2563eb;   /* Blue 600    · 5.2:1 sobre blanco */
+  --mod-diligencia:#b45309;  /* Amber 700   · 5.0:1 */
+  --mod-similitud:#047857;   /* Emerald 700 · 5.5:1, y distinto del --bien
+                                del veredicto (#006300) para que no se lea
+                                como «este análisis ha salido bien» */
+}
 .cuadros{ display:flex; gap:.7rem; flex-wrap:wrap; margin:.4rem 0 .6rem 0; }
 .cuadro{
   flex:1 1 280px; background:#fff; border:1px solid var(--borde);
-  border-top:3px solid var(--nulo-marca); border-radius:var(--radio);
-  padding:.9rem 1rem; display:flex; flex-direction:column;
+  border-top:4px solid var(--mod, var(--nulo-marca));
+  border-radius:var(--radio) var(--radio) 0 0;
+  padding:1rem 1.1rem .9rem 1.1rem; display:flex; flex-direction:column;
+  height:100%; transition:box-shadow .15s ease, transform .15s ease;
 }
-.cuadro--activo{ border-top-color:var(--mal-marca);
-                 box-shadow:0 4px 16px rgba(15,23,42,.08); }
-.cuadro .q-e{ font-size:.66rem; font-weight:700; letter-spacing:.1em;
+.cuadro--activo{ box-shadow:0 4px 16px rgba(15,23,42,.09); }
+.cuadro .q-ico{ display:flex; align-items:center; gap:.5rem;
+                color:var(--mod, var(--tinta-3)); margin-bottom:.45rem; }
+.cuadro .q-ico svg{ width:22px; height:22px; flex:0 0 22px; }
+.cuadro .q-e{ font-size:.64rem; font-weight:750; letter-spacing:.11em;
               text-transform:uppercase; color:var(--tinta-3); }
-.cuadro--activo .q-e{ color:var(--mal); }
-.cuadro .q-n{ font-size:1.05rem; font-weight:680; color:var(--tinta);
-              margin:.12rem 0 .05rem 0; line-height:1.25; }
+.cuadro--activo .q-e{ color:var(--mod); }
+.cuadro .q-n{ font-size:1.12rem; font-weight:700; color:var(--tinta);
+              margin:.1rem 0 .05rem 0; line-height:1.22;
+              letter-spacing:-.01em; }
 .cuadro .q-m{ font-size:.76rem; color:var(--tinta-3); }
-.cuadro .q-d{ font-size:.84rem; color:var(--tinta-2); line-height:1.5;
-              margin-top:.45rem; }
-.cuadro .q-c{ margin-top:.6rem; border-top:1px solid var(--linea);
-              padding-top:.55rem; }
+.cuadro .q-d{ font-size:.85rem; color:var(--tinta-2); line-height:1.5;
+              margin-top:.55rem; }
+.cuadro .q-c{ margin-top:.7rem; border-top:1px solid var(--linea);
+              padding-top:.6rem; }
 .cuadro .q-c .l{ display:flex; justify-content:space-between; gap:.6rem;
-                 font-size:.84rem; padding:.14rem 0; }
+                 font-size:.85rem; padding:.16rem 0; }
 .cuadro .q-c .l b{ color:var(--tinta); font-variant-numeric:tabular-nums; }
-.cuadro .q-c .l .mal{ color:var(--mal); font-weight:680; }
-.cuadro .q-v{ font-size:.76rem; color:var(--tinta-3); margin-top:.5rem; }
+.cuadro .q-c .l .mal{ color:var(--mal); font-weight:700; }
+.cuadro .q-v{ font-size:.78rem; color:var(--tinta-3); margin-top:.55rem; }
+/* Empuja el veredicto al pie para que las tres tarjetas terminen a la vez. */
+.cuadro .q-v:last-child{ margin-top:auto; padding-top:.55rem; }
+
+/* --- La tarjeta ENTERA es el botón --------------------------------------- */
+/*
+   Streamlit no deja convertir un `div` en botón, así que la tarjeta y el botón
+   van en la misma columna y se cosen con CSS: el botón hereda el borde, pierde
+   la esquina de arriba y se pega a la tarjeta (margen negativo de 1px). El
+   `:hover` cuelga de la COLUMNA —no del botón— para que al pasar por encima
+   reaccionen los dos a la vez y se lea como una sola pieza pulsable.
+*/
+/* Las tres a la misma altura, o el panel se lee como tres cosas distintas.
+   Hay que estirar toda la cadena de contenedores que Streamlit mete entre la
+   columna y el `div` de la tarjeta; con que uno se quede a su altura natural,
+   los botones dejan de alinearse. */
+[data-testid="stColumn"]:has(.cuadro) > [data-testid="stVerticalBlock"]{
+  height:100%; gap:0;
+}
+[data-testid="stColumn"]:has(.cuadro)
+  [data-testid="stElementContainer"]:has(.cuadro),
+[data-testid="stColumn"]:has(.cuadro) [data-testid="stMarkdown"]:has(.cuadro),
+[data-testid="stColumn"]:has(.cuadro)
+  [data-testid="stMarkdown"]:has(.cuadro) > div,
+[data-testid="stColumn"]:has(.cuadro)
+  [data-testid="stMarkdownContainer"]:has(.cuadro){
+  display:flex; flex-direction:column; flex:1 1 auto; width:100%;
+}
+[data-testid="stColumn"]:has(.cuadro) .stButton > button{
+  border-top-left-radius:0; border-top-right-radius:0;
+  border-top:0; margin-top:-1px; box-shadow:none;
+  font-weight:660; padding-top:.6rem; padding-bottom:.6rem;
+}
+/* Cada botón lleva el color de SU herramienta, que es lo que remata la pieza:
+   la banda de arriba, el icono y la puerta de abajo dicen lo mismo. El color
+   viaja por una clase de la tarjeta y se recoge con `:has()`, porque una
+   variable CSS no sube de la tarjeta a la columna. */
+[data-testid="stColumn"]:has(.mod-diligencia) .stButton > button{
+  color:var(--mod-diligencia); border-color:#f2c98d;
+  background:#fffbeb;
+}
+[data-testid="stColumn"]:has(.mod-diligencia) .stButton > button:hover{
+  background:#fef3c7; border-color:var(--mod-diligencia); }
+[data-testid="stColumn"]:has(.mod-similitud) .stButton > button{
+  color:var(--mod-similitud); border-color:#96dfc0;
+  background:#ecfdf5;
+}
+[data-testid="stColumn"]:has(.mod-similitud) .stButton > button:hover{
+  background:#d1fae5; border-color:var(--mod-similitud); }
+[data-testid="stColumn"]:has(.cuadro):hover .cuadro{
+  transform:translateY(-2px);
+  box-shadow:0 10px 24px rgba(15,23,42,.12);
+}
+[data-testid="stColumn"]:has(.cuadro):hover .stButton > button{
+  transform:translateY(-2px);
+}
+[data-testid="stColumn"]:has(.cuadro) .stButton{ margin-top:0; }
 
 /* --- Naturaleza: qué capa resuelve cada pantalla ------------------------- */
 /* Del customer journey de Fabián. No es decoración: es una afirmación sobre el
@@ -607,6 +698,83 @@ div.stButton > button:disabled{ color:var(--tinta-3); }
                      text-transform:uppercase; color:var(--tinta-3); }
 .sesion-campos .s-v{ font-size:.92rem; font-weight:650; color:var(--tinta);
                      margin-top:.1rem; }
+
+/* Un enlace que se abre fuera, con aspecto de botón secundario. No es un botón
+   de Streamlit a propósito: tiene que ser un `<a target="_blank">` de verdad
+   para que el navegador abra pestaña y la consola no se recargue. */
+.boton-enlace{
+  display:inline-block; text-decoration:none !important;
+  background:#fff; border:1px solid var(--acento-borde);
+  color:var(--acento) !important; font-weight:640; font-size:.9rem;
+  padding:.5rem 1rem; border-radius:var(--radio); margin:.2rem 0 .1rem 0;
+}
+.boton-enlace:hover{ background:var(--acento-suave);
+                     border-color:var(--acento); }
+
+/* --- Puesto de trabajo: quién eres, qué haces, qué te deja hacer --------- */
+.puesto{
+  background:linear-gradient(180deg,#fff,var(--plano));
+  border:1px solid var(--borde); border-radius:var(--radio);
+  padding:1.2rem 1.35rem; margin:.3rem 0 .9rem 0;
+}
+.puesto .p-cab{ display:flex; align-items:baseline; gap:.7rem; flex-wrap:wrap; }
+.puesto .p-nom{ font-size:1.5rem; font-weight:700; letter-spacing:-.02em;
+                color:var(--tinta); line-height:1.15; }
+.puesto .p-rol{ font-size:.95rem; font-weight:650; color:var(--acento); }
+.puesto .p-meta{ font-size:.85rem; color:var(--tinta-3); margin-top:.25rem; }
+.puesto .p-com{ font-size:.95rem; color:var(--tinta-2); line-height:1.55;
+                margin-top:.85rem; padding-top:.85rem;
+                border-top:1px solid var(--linea); }
+.puesto .p-com b{ color:var(--tinta); }
+.puesto .p-manda{ font-size:.82rem; color:var(--tinta-3); line-height:1.5;
+                  margin-top:.5rem; font-style:italic; }
+
+.permisos{ display:flex; gap:.6rem; flex-wrap:wrap; margin:.2rem 0 .9rem 0; }
+.permisos > div{
+  flex:1 1 260px; background:#fff; border:1px solid var(--borde);
+  border-radius:var(--radio); padding:.85rem .95rem;
+}
+.permisos .pm-t{ font-size:.68rem; font-weight:700; letter-spacing:.09em;
+                 text-transform:uppercase; margin-bottom:.5rem; }
+.permisos .pm-l{ font-size:.87rem; line-height:1.5; color:var(--tinta-2);
+                 padding-left:1.15rem; text-indent:-1.15rem; margin:.3rem 0; }
+.permisos .pm-g{ font-weight:700; margin-right:.4rem; }
+.permisos .pm-vacia{ font-size:.85rem; color:var(--tinta-3); font-style:italic; }
+.pm--si{ border-color:var(--bien-borde); background:var(--bien-fondo); }
+.pm--si .pm-t, .pm--si .pm-g{ color:var(--bien); }
+.pm--no{ border-color:var(--mal-borde); background:var(--mal-fondo); }
+.pm--no .pm-t, .pm--no .pm-g{ color:var(--mal); }
+/* Lo que no consta NO es un no: azul de espera, nunca el rojo de al lado. */
+.pm--nc{ border-color:var(--espera-borde); background:var(--espera-fondo); }
+.pm--nc .pm-t, .pm--nc .pm-g{ color:var(--espera); }
+
+/* --- Historial de resueltas ---------------------------------------------- */
+/* La marca distingue CRITERIO de EXCEPCIÓN, y no por color solamente: lleva la
+   palabra. Son las dos cosas que este cierre tiene que dejar claras y no se
+   pueden confiar a un matiz de tono. */
+.hlista{ display:flex; flex-direction:column; gap:.5rem; margin:.3rem 0 .8rem 0; }
+.hres{
+  background:#fff; border:1px solid var(--borde);
+  border-left:3px solid var(--nulo-marca); border-radius:var(--radio);
+  padding:.7rem .9rem;
+}
+.hres--crit{ border-left-color:var(--bien-marca); background:var(--bien-fondo); }
+.hres--prop{ border-left-color:var(--espera-marca); background:var(--espera-fondo); }
+.hres--prop .hr-m{ color:var(--espera); }
+.hres .hr-v{ color:var(--tinta-3); font-weight:400; font-size:.88em; }
+.hres .hr-c{ display:flex; justify-content:space-between; align-items:baseline;
+             gap:.6rem; }
+.hres .hr-p{ font-size:.76rem; font-weight:700; color:var(--tinta-3);
+             letter-spacing:.02em; }
+.hres .hr-m{ font-size:.62rem; font-weight:750; letter-spacing:.1em;
+             color:var(--nulo); }
+.hres--crit .hr-m{ color:var(--bien); }
+.hres .hr-t{ font-size:.95rem; color:var(--tinta); margin-top:.2rem; }
+.hres .hr-t b{ font-variant-numeric:tabular-nums; }
+.hres .hr-f{ font-size:.78rem; color:var(--tinta-2); margin-top:.3rem; }
+.hres .hr-j{ font-size:.79rem; color:var(--tinta-3); margin-top:.25rem;
+             font-style:italic; line-height:1.45; }
+.memoria .m-d{ color:var(--tinta-3); font-weight:400; font-size:.85em; }
 
 /* --- Evidencia: las dos afirmaciones con su cita ------------------------- */
 .evi{ display:flex; gap:.6rem; flex-wrap:wrap; margin:.4rem 0 .5rem 0; }
@@ -785,7 +953,12 @@ def nota(texto, acento=False, tono=None):
     """
     clase = ("nota nota--espera" if tono == "espera"
              else "nota nota--acento" if acento else "nota")
-    st.markdown(f'<div class="{clase}">{texto}</div>', unsafe_allow_html=True)
+    # Las negritas de `**así**` se convierten, igual que en el resto de piezas.
+    # Antes no: el que llamaba tenía que escribir `<b>` a mano, y en cuanto un
+    # texto venía de otro sitio —una nota del módulo de auditoría, por ejemplo—
+    # los asteriscos salían en pantalla tal cual.
+    cuerpo = _NEGRITA.sub(r"<b>\1</b>", texto or "")
+    st.markdown(f'<div class="{clase}">{cuerpo}</div>', unsafe_allow_html=True)
 
 
 def kpi(etiqueta, valor, nota_pie="", acento=False):
@@ -1065,6 +1238,71 @@ def cotejo(filas):
         f'<tbody>{cuerpo}</tbody></table>', unsafe_allow_html=True)
 
 
+# Un icono por herramienta, dibujado y no de una fuente de emojis.
+#
+# Los emojis los pinta cada sistema operativo a su manera y en una demostración
+# proyectada desde un portátil ajeno salen de otro color y de otro tamaño. Estos
+# son trazos que heredan el color del módulo y escalan con la tarjeta.
+ICONO_MODULO = {
+    # Dos flechas enfrentadas: dos documentos que no dicen lo mismo.
+    "incongruencias":
+        '<path d="M3 8h14l-3-3M21 16H7l3 3"/>',
+    # Un reloj: lo que sitúa los contratos en el tiempo.
+    "diligencia":
+        '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>',
+    # Dos círculos que se solapan: lo parecido a lo ya hecho.
+    "similitud":
+        '<circle cx="9" cy="12" r="6"/><circle cx="15" cy="12" r="6"/>',
+}
+
+COLOR_MODULO = {
+    "incongruencias": "var(--mod-auditoria)",
+    "diligencia": "var(--mod-diligencia)",
+    "similitud": "var(--mod-similitud)",
+}
+
+
+def _icono(clave):
+    trazos = ICONO_MODULO.get(clave)
+    if not trazos:
+        return ""
+    return (f'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+            f'stroke-width="1.8" stroke-linecap="round" '
+            f'stroke-linejoin="round">{trazos}</svg>')
+
+
+def cuadro_herramienta(c):
+    """
+    Una de las tres herramientas, como tarjeta suelta.
+
+    Va suelta —y no las tres de una vez— porque cada una lleva debajo su propio
+    botón, y para que la tarjeta y el botón se lean como una sola pieza pulsable
+    tienen que caer en la misma columna. Ver el bloque «la tarjeta ENTERA es el
+    botón» del CSS.
+    """
+    color = COLOR_MODULO.get(c["id"], "var(--nulo-marca)")
+    contenido = ""
+    if c.get("lineas"):
+        filas = "".join(
+            f'<div class="l"><span>{_e(k)}</span>'
+            f'<b class="{"mal" if destacar else ""}">{_e(v)}</b></div>'
+            for k, v, destacar in c["lineas"])
+        contenido = f'<div class="q-c">{filas}</div>'
+    veredicto = (f'<div class="q-v">{_texto(c["veredicto"])}</div>'
+                 if c.get("veredicto") else "")
+    st.markdown(
+        f'<div class="cuadro mod-{_e(c["id"])} '
+        f'{"cuadro--activo" if c.get("activo") else ""}" '
+        f'style="--mod:{color}">'
+        f'<div class="q-ico">{_icono(c["id"])}'
+        f'<span class="q-e">{_e(c.get("estado", "No aplica a este caso"))}</span>'
+        f'</div>'
+        f'<div class="q-n">{_e(c["nombre"])}</div>'
+        f'<div class="q-m">{_e(c.get("modulo", ""))}</div>'
+        f'<div class="q-d">{_e(c["descripcion"])}</div>'
+        f'{contenido}{veredicto}</div>', unsafe_allow_html=True)
+
+
 def cuadros_herramientas(cuadros):
     """
     Las tres herramientas del equipo, cada una con lo que sabe de este caso.
@@ -1074,27 +1312,10 @@ def cuadros_herramientas(cuadros):
     cifras. Los otros dos no se ocultan — verlos es lo que hace entender que
     esto es un centro de control y no una herramienta suelta.
     """
-    trozos = []
+    st.markdown('<div class="cuadros">', unsafe_allow_html=True)
     for c in cuadros:
-        activo = c.get("activo")
-        contenido = ""
-        if c.get("lineas"):
-            filas = "".join(
-                f'<div class="l"><span>{_e(k)}</span>'
-                f'<b class="{"mal" if destacar else ""}">{_e(v)}</b></div>'
-                for k, v, destacar in c["lineas"])
-            contenido = f'<div class="q-c">{filas}</div>'
-        veredicto = (f'<div class="q-v">{_texto(c["veredicto"])}</div>'
-                     if c.get("veredicto") else "")
-        trozos.append(
-            f'<div class="cuadro {"cuadro--activo" if activo else ""}">'
-            f'<div class="q-e">{_e(c.get("estado", "No aplica a este caso"))}</div>'
-            f'<div class="q-n">{_e(c["nombre"])}</div>'
-            f'<div class="q-m">{_e(c.get("modulo", ""))}</div>'
-            f'<div class="q-d">{_e(c["descripcion"])}</div>'
-            f'{contenido}{veredicto}</div>')
-    st.markdown(f'<div class="cuadros">{"".join(trozos)}</div>',
-                unsafe_allow_html=True)
+        cuadro_herramienta(c)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 
 GLIFO_ESTADO = {"limpio": "✓", "incidencia": "✕", "incompleto": "◌",
@@ -1177,6 +1398,167 @@ def ficha_sesion(rol, nivel, area, empresa, permisos, actividad=None):
         f'ontología de la empresa</div>'
         f'<div class="sesion-campos">{cuerpo}</div></div>',
         unsafe_allow_html=True)
+
+
+def _plano_ui(s):
+    """Sin acentos ni mayúsculas, para comparar dos etiquetas sin pelearse."""
+    import unicodedata
+    s = unicodedata.normalize("NFKD", str(s or "").lower())
+    return "".join(c for c in s if not unicodedata.combining(c)).strip()
+
+
+def ficha_puesto(f):
+    """
+    La pantalla del empleado: quién es, qué tiene que hacer, qué manda.
+
+    Es la traducción a persona de lo que antes era un desplegable de roles. La
+    diferencia no es estética: un desplegable dice «elige un rol» y esto dice
+    «éste eres tú», que es lo que ocurre cuando alguien entra en la aplicación
+    de su empresa un martes por la mañana.
+
+    Recibe la ficha de `demo.identidad.ficha()` entera.
+
+    Lo que encabeza es el **puesto**, no una persona. La autoridad la lleva el
+    puesto: la matriz de Pablo no dice que fulano pueda validar, dice que los
+    Encargados de Turno pueden. Poner un nombre arriba afirmaría algo que la
+    ontología no afirma en ninguna parte.
+    """
+    meta = " · ".join(str(x) for x in [
+        f'Nivel {f["nivel"]}' if f.get("nivel") else None,
+        f.get("area"),
+        f.get("tipo_de_autoridad"),
+    ] if x)
+    # El título del puesto y la fila de la matriz que lo gobierna son dos datos.
+    # Cuando no se llaman igual —«Ingeniero Jefe» / «Dir. Producción»— se
+    # enseñan los dos, porque es de la segunda de donde salen los permisos.
+    fila = (f'<div class="p-rol">según la matriz: {_e(f["rol"])}</div>'
+            if _plano_ui(f.get("puesto")) != _plano_ui(f.get("rol")) else "")
+    st.markdown(
+        f'<div class="puesto"><div class="p-cab">'
+        f'<div class="p-nom">{_e(f.get("puesto") or f["rol"])}</div>{fila}</div>'
+        f'<div class="p-meta">GraphyCems'
+        + (f' · {_e(meta)}' if meta else "") + '</div>'
+        + (f'<div class="p-com"><b>Lo que tiene que hacer.</b> '
+           f'{_e(f["cometido"])}</div>' if f.get("cometido") else "")
+        + (f'<div class="p-manda">Manda sobre: {_e(f["manda_sobre"])}</div>'
+           if f.get("manda_sobre") else "")
+        + '</div>', unsafe_allow_html=True)
+
+
+def permisos_del_puesto(perm):
+    """
+    Lo que puede y lo que no, en tres columnas y no en dos.
+
+    La tercera columna es la que suele faltar en estas pantallas. Un permiso que
+    la ontología no sabe resolver **no es un permiso denegado**: enseñarlo en
+    rojo junto a los denegados convertiría un hueco del organigrama en una
+    decisión del sistema, que es justo lo que este proyecto no hace.
+    """
+    bloques = [
+        ("si", "Lo que puede hacer", "✓", perm["puede"],
+         "Este puesto no puede intervenir en ninguna contradicción."),
+        ("no", "Lo que no puede hacer", "✕", perm["no_puede"],
+         "No hay nada que la ontología le niegue."),
+        ("nc", "Lo que no consta", "?", perm["no_consta"],
+         "Todo lo suyo está resuelto en la ontología."),
+    ]
+    trozos = []
+    for clave, titulo, glifo, filas, vacia in bloques:
+        if not filas and clave == "nc":
+            continue                      # sin huecos no hace falta la columna
+        cuerpo = "".join(
+            f'<div class="pm-l"><span class="pm-g">{glifo}</span>'
+            f'{_e(x["frase"])}</div>' for x in filas
+        ) or f'<div class="pm-vacia">{_e(vacia)}</div>'
+        trozos.append(f'<div class="pm--{clave}"><div class="pm-t">{_e(titulo)}'
+                      f'</div>{cuerpo}</div>')
+    st.markdown(f'<div class="permisos">{"".join(trozos)}</div>',
+                unsafe_allow_html=True)
+
+
+# Cómo se lee cada decisión cuando se cuenta en pasado.
+#
+# Las claves internas —`dar_por_buena`— no se enseñan nunca: en una lista de
+# decisiones humanas, una etiqueta con guiones bajos delata que lo que se está
+# enseñando es una fila de base de datos y no lo que hizo una persona.
+VERBO_DECISION = {
+    "aceptar": "acepta el valor del cliente",
+    "dar_por_buena": "da por buena la orden",
+    "corregir": "corrige",
+    "escalar": "escala",
+}
+
+
+def _verbo(decision):
+    return VERBO_DECISION.get(decision, decision or "")
+
+
+def registro_actividad(filas, limite=None):
+    """
+    Las últimas acciones: qué se propuso, qué se cerró, quién y cuándo.
+
+    Es el registro que pide la pantalla 8 de Fabián y el que Mencía llama
+    «resueltas» en su módulo, con una diferencia: aquí entran también las
+    **propuestas**. Un encargado que mira una incidencia, dice qué haría y por
+    qué, y no puede cerrarla ha hecho un trabajo — y si no consta, a los seis
+    meses parece que no lo hizo nadie.
+
+    Cada fila lleva la marca de lo que es: PROPUESTA, CRITERIO o EXCEPCIÓN. En
+    palabras y no sólo en color, porque es la única cosa que esta lista tiene
+    que dejar clara.
+    """
+    filas = list(filas or [])
+    if not filas:
+        st.caption("Todavía no se ha registrado ninguna acción.")
+        return
+    total = len(filas)
+    if limite:
+        filas = filas[:limite]
+    trozos = []
+    for f in filas:
+        propuesta = f.get("fase") == "propuesta"
+        criterio = f.get("es_criterio")
+        marca = ("PROPUESTA" if propuesta else
+                 "CRITERIO" if criterio else "EXCEPCIÓN")
+        clase = ("hres--prop" if propuesta else
+                 "hres--crit" if criterio else "")
+        quien = (f.get("propuesta_por") if propuesta
+                 else f.get("validada_por"))
+        firmas = " · ".join(x for x in [
+            f'{"Propone" if propuesta else "Cierra"} {quien}' if quien else None,
+            (f'antes lo propuso {f["propuesta_por"]}'
+             if not propuesta and f.get("propuesta_por") else None),
+        ] if x)
+        decidido = _cifra(f.get("valor_decidido")) or _verbo(f.get("decision"))
+        trozos.append(
+            f'<div class="hres {clase}">'
+            f'<div class="hr-c">'
+            f'<div class="hr-p">{_e(f.get("pedido", ""))}</div>'
+            f'<div class="hr-m">{_e(marca)}</div></div>'
+            f'<div class="hr-t">{_e(f.get("etiqueta", f.get("campo", "")))}: '
+            f'{_e(_cifra(f.get("valor_cliente")))} contra '
+            f'{_e(_cifra(f.get("valor_orden")))} → '
+            f'<b>{_e(decidido)}</b> '
+            f'<span class="hr-v">({_e(_verbo(f.get("decision")))})</span></div>'
+            f'<div class="hr-f">{_e(firmas)}'
+            + (f' · {_e(_fecha_hora(f.get("cuando")))}' if f.get("cuando") else "")
+            + '</div>'
+            + (f'<div class="hr-j">«{_e(f["justificacion"])}»</div>'
+               if f.get("justificacion") else "")
+            + '</div>')
+    st.markdown(f'<div class="hlista">{"".join(trozos)}</div>',
+                unsafe_allow_html=True)
+    if limite and total > limite:
+        st.caption(f'Se muestran las {limite} últimas de {total} acciones '
+                   f'registradas.')
+
+
+def _fecha_hora(iso):
+    """`2026-09-14T17:05:00+00:00` → `14/09/2026 · 17:05`."""
+    t = str(iso or "")
+    if len(t) < 16:
+        return t[:10]
+    return f"{t[8:10]}/{t[5:7]}/{t[0:4]} · {t[11:16]}"
 
 
 def _cita_html(fragmento):
@@ -1267,9 +1649,17 @@ def barra_consola(marca, estado, operario=None):
         f'<div class="c-sep"></div>{quien}</div>', unsafe_allow_html=True)
 
 
-def tarjeta_alarma(prioridad, referencia, titulo, detalle):
+def tarjeta_alarma(prioridad, referencia, titulo, detalle, revisar=False):
+    """
+    Una incidencia en la cola.
+
+    `revisar` la pinta en azul de espera en vez de en rojo: es lo que el módulo
+    de auditoría saca «a revisar» y no como incongruencia. Pintar las dos igual
+    diría que son lo mismo, y todo el recorrido consiste en que no lo son.
+    """
     st.markdown(
-        f'<div class="alarma"><div class="al-c">'
+        f'<div class="alarma {"alarma--revisar" if revisar else ""}">'
+        f'<div class="al-c">'
         f'<div class="al-p">{_e(prioridad)}</div>'
         f'<div class="al-r">{_e(referencia)}</div></div>'
         f'<div class="al-t">{_e(titulo)}</div>'
@@ -1325,20 +1715,30 @@ def precedente(sug):
 
 
 def panel_memoria(res):
-    """Lo que el sistema ha aprendido, en crudo y auditable."""
-    if not res["decisiones"]:
-        nota("Todavía no hay ninguna decisión registrada. La memoria se llena "
-             "con lo que se vaya resolviendo, y a partir de ahí las alarmas "
-             "parecidas llegan con su precedente puesto.", tono="espera")
+    """
+    Lo que el sistema ha APRENDIDO, en crudo y auditable.
+
+    Sólo criterios. Lo cerrado como excepción está en el historial y no aquí:
+    mezclarlos haría que la memoria pareciera más llena de lo que está, y sobre
+    todo daría a entender que una excepción va a volver — que es exactamente lo
+    que alguien decidió que no pasara al no marcarla.
+    """
+    criterios = res.get("ultimos_criterios", res.get("ultimas") or [])
+    if not criterios:
+        nota("Todavía no hay ningún criterio guardado. La memoria se llena con "
+             "lo que alguien marque para la próxima, y a partir de ahí las "
+             "incidencias parecidas llegan con su precedente puesto.",
+             tono="espera")
         return
     filas = "".join(
         f'<div class="mem-fila"><div class="m-p">{_e(r["pedido"])}</div>'
         f'<div class="m-q">{_e(r["etiqueta"] or r["campo"])}: '
         f'{_e(_cifra(r["valor_cliente"]))} contra '
         f'{_e(_cifra(r["valor_orden"]))} → '
-        f'<b>{_e(r["decision"])}</b></div>'
+        f'<b>{_e(_cifra(r.get("valor_decidido")) or _verbo(r.get("decision")))}'
+        f'</b> <span class="m-d">({_e(_verbo(r.get("decision")))})</span></div>'
         f'<div class="m-w">{_e(r["validada_por"])}</div></div>'
-        for r in res["ultimas"])
+        for r in criterios)
     st.markdown(f'<div class="memoria">{filas}</div>', unsafe_allow_html=True)
 
 

@@ -280,15 +280,29 @@ def encaminar(incidencia):
 # 3 · El tamaño del problema
 # ---------------------------------------------------------------------------
 
+# Los campos que cuentan EJEMPLARES. Sólo de ésos tiene sentido decir «tantos
+# de más» y «tantas veces lo pedido».
+CAMPOS_CONTABLES = ("cantidad",)
+
+
 def impacto(discrepancia, coste_unitario=None):
     """
     Cuánto es «no cuadra», en unidades y, si alguien lo aporta, en dinero.
+
+    Sólo para los campos que cuentan ejemplares. Un gramaje de 250 donde se
+    pidieron 240 **no son «10 unidades de más»** ni «una vez lo pedido»: son
+    diez gramos por metro cuadrado, y la resta no significa nada parecido. La
+    versión anterior lo calculaba igual para cualquier campo numérico y sacaba
+    frases que no querían decir nada — que es peor que no decir nada, porque
+    parecen un dato.
 
     El coste unitario **no se inventa**: llega vacío y sólo aparece si quien mira
     la demo lo escribe. Un número de euros sacado de la nada convertiría una
     demostración en un folleto, y el primero que preguntara de dónde sale se
     llevaría por delante todo lo demás.
     """
+    if (discrepancia.get("campo") or "") not in CAMPOS_CONTABLES:
+        return None
     try:
         a = float(str(discrepancia.get("valor_cliente")).replace(".", "").replace(",", "."))
         b = float(str(discrepancia.get("valor_orden")).replace(".", "").replace(",", "."))

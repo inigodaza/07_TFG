@@ -27,6 +27,7 @@ from datetime import date
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as componentes
 
 # Las tres carpetas del proyecto, antes que nada.
 #
@@ -68,7 +69,7 @@ if _sin_subir:
 import esquema
 import modulos
 import ui
-from demo import caso, consola, flujo, guion, naturaleza, sesion
+from demo import caso, consola, flujo, guion, identidad, naturaleza, sesion
 from modulos import auditoria, contradicciones, similitud, vigencia
 from nucleo import VERSION
 from nucleo import asesor, autoridad, clasificacion, historial, llm, memoria, plantilla
@@ -80,7 +81,7 @@ st.set_page_config(page_title="Evaluación y Calidad — TFG", layout="wide",
                    page_icon="◍", initial_sidebar_state="expanded")
 ui.inyectar_estilo()
 
-VERSION_REQUERIDA = 12
+VERSION_REQUERIDA = 20
 
 # Comprobación de coherencia al arrancar.
 #
@@ -109,10 +110,14 @@ PIEZAS = [
                    "lecturas_de_campo", "mapa_organizativo",
                    "sesion_iniciada", "cadena_de_custodia", "barra_pasos",
                    "bandeja", "aviso_incidencia", "enfrentar",
+                   "tarjeta_alarma:revisar",
                    "rejilla_herramientas", "consulta_pedido", "recibo",
                    "auditando", "cotejo", "cuadros_herramientas",
+                   "cuadro_herramienta",
                    "barra_consola", "tarjeta_alarma", "naturaleza",
-                   "ficha_sesion", "evidencia_enfrentada",
+                   "ficha_sesion", "ficha_puesto", "permisos_del_puesto",
+                   "registro_actividad",
+                   "evidencia_enfrentada",
                    "registro_criterio",
                    "contexto_del_operario", "precedente",
                    "panel_memoria"]),
@@ -132,19 +137,25 @@ PIEZAS = [
                                 "PROPUESTA", "VALIDADA"]),
     ("demo/naturaleza.py", naturaleza, ["PANTALLAS", "capas_de",
                                         "resumen", "ACTUA"]),
-    ("demo/consola.py", consola, ["arrancar", "lotes", "contexto_operario",
+    ("demo/consola.py", consola, ["arrancar", "lotes",
+                                  "contexto_operario:persona",
                                   "acciones_para", "actuar",
                                   "analisis_incongruencias",
                                   "analisis_diligencia",
                                   "analisis_similitud", "ANALISIS", "cotejo",
                                   "cuadros_del_caso", "PASOS_AUDITORIA",
                                   "diagnostico", "fragmento_de",
-                                  "contexto_del_caso"]),
-    ("nucleo/memoria.py", memoria, ["registrar", "precedentes",
+                                  "contexto_del_caso", "ACEPTACIONES",
+                                  "actuar:es_criterio", "etiqueta_accion",
+                                  "etiqueta_severidad", "nota_de_revision"]),
+    ("nucleo/memoria.py", memoria, ["registrar:es_criterio", "historial",
+                                    "precedentes",
                                     "sugerencia", "resumen",
                                     "olvidar", "clase_de",
                                     "aplica_a",
                                     "registrar:justificacion"]),
+    ("demo/identidad.py", identidad, ["entrar", "ficha", "permisos",
+                                      "perfil_html", "usuarios", "PLANTILLA"]),
     ("demo/flujo.py", flujo, ["procesar", "primera_incidencia",
                               "encaminar", "impacto", "agrupar",
                               "PASOS", "HERRAMIENTAS"]),
@@ -192,9 +203,9 @@ for _fichero, _modulo, _piezas in PIEZAS:
 
 # El número propio de `ui.py`, que es el fichero que más cambia y el que más
 # veces se ha quedado atrás al subirlo.
-if getattr(ui, "VERSION_UI", 0) < 12:
+if getattr(ui, "VERSION_UI", 0) < 20:
     _faltan.append(("ui.py", [f"es la versión {getattr(ui, 'VERSION_UI', 'antigua')} "
-                              f"y se necesita la 12"]))
+                              f"y se necesita la 20"]))
 
 if VERSION < VERSION_REQUERIDA or _faltan:
     st.error("**El repositorio está a medio subir.** Hay ficheros de versiones "
@@ -270,6 +281,45 @@ elif "spa" not in P.idiomas_ocr():
 # dos dejaba meter un caso y verlo recorrer el sistema. Ahora es una sola y se
 # ejecuta con los documentos que le pongas delante.
 PANTALLAS = ["Consola", "Evaluar un módulo", "Esquema del sistema"]
+
+# ------------------------------------------------------ EL ORGANIGRAMA, APARTE
+#
+# `?vista=organigrama` abre la ficha de Pablo a pantalla completa y no pinta
+# nada más. Como es una dirección de la propia aplicación, un enlace con
+# `target="_blank"` la abre en otra pestaña y la consola se queda intacta en la
+# suya.
+#
+# Por qué NO se sirve como fichero estático
+# ------------------------------------------
+# La versión anterior lo colgaba de `static/` con `enableStaticServing`. En
+# local funciona; en Streamlit Cloud salía **una pestaña en blanco**, que es lo
+# que devuelve Streamlit cuando la ruta no corresponde a ningún fichero: entrega
+# el armazón de la aplicación, el armazón busca sus propios recursos colgando de
+# `/app/static/`, no los encuentra, y no pinta nada.
+#
+# Da igual cuál de las tres causas fuera —la carpeta sin subir, el `config.toml`
+# sin subir, o el servicio de estáticos desactivado en Cloud—: las tres fallan
+# igual de silenciosamente y las tres fallan **durante la demostración**. Esta
+# vía no depende de ninguna configuración ni de que una carpeta haya llegado al
+# repositorio: si el HTML está, se ve; y si no está, lo dice con todas las
+# letras en vez de abrir una pestaña en blanco.
+if st.query_params.get("vista") == "organigrama":
+    st.markdown(
+        '<style>[data-testid="stSidebar"], header, footer{display:none!important}'
+        '.block-container{padding:.6rem 1rem!important;max-width:100%!important}'
+        '</style>', unsafe_allow_html=True)
+    _perfil = identidad.perfil_html(st.query_params.get("puesto", ""))
+    if _perfil:
+        componentes.html(_perfil, height=1500, scrolling=True)
+    else:
+        st.error("**No se encuentra el organigrama.** El fichero "
+                 "`static/organigrama.html` no ha llegado al repositorio: una "
+                 "carpeta sólo existe en GitHub si contiene ficheros, y ésta se "
+                 "queda por el camino con facilidad.")
+        st.caption("Puestos con organigrama: "
+                   + ", ".join(p["usuario"] for p in identidad.usuarios()
+                               if p.get("perfil")))
+    st.stop()
 
 with st.sidebar:
     st.markdown('<div class="eyebrow">TFG · Íñigo Daza</div>'
@@ -362,118 +412,62 @@ def _consola_docs():
 
 
 def _herramientas(alarma, estado):
-    """Las tres herramientas de análisis del esquema, cada una haciendo algo."""
-    st.markdown("#### Herramientas de análisis")
-    st.caption("Las del equipo, disponibles sobre esta alarma. Cada una responde "
-               "una pregunta distinta, y la que no puede responder lo dice.")
+    """
+    La herramienta que le corresponde a esta alarma. Sólo ella.
 
-    a1, a2, a3 = consola.ANALISIS
+    Antes se pintaban las tres, una debajo de otra, con sus desplegables. Era
+    repetir el panel que se acaba de dejar atrás —donde ya están las tres y
+    desde donde se elige— y además convertía la pantalla de la evidencia en un
+    índice. Aquí se viene a mirar una cosa; las otras dos se abren desde el
+    panel, que es donde tiene sentido compararlas.
+    """
+    a1 = consola.ANALISIS[0]
 
-    # 1 · Incongruencias — la herramienta que le corresponde a esta alarma.
-    #     Es la pantalla 5 del guion: evidencia y diagnóstico.
-    with st.expander(f"{a1['nombre']} — {a1['pregunta']}", expanded=True):
-        st.caption(a1["modulo"])
-        ui.naturaleza(naturaleza.capas_de("evidencia"))
+    # La pantalla 5 del guion: evidencia y diagnóstico.
+    st.markdown(f'#### {a1["nombre"]}')
+    st.caption(f'{a1["modulo"]} — {a1["pregunta"]}')
+    diag = consola.diagnostico(alarma)
+    ui.evidencia_enfrentada(diag["apoyan_cliente"], diag["apoyan_orden"])
+    pastilla = ("p-mal" if diag["clave"] == "error_probable" else
+                "p-espera" if diag["clave"] != "cambio_documentado"
+                else "p-acento")
+    st.markdown(
+        ui.pastilla(diag["etiqueta"], pastilla, "◆")
+        + f'&nbsp;&nbsp;<span style="font-size:.87rem;color:var(--tinta-2)">'
+          f'{html.escape(diag["por_que"])}</span>', unsafe_allow_html=True)
+    st.caption(f'Y en cualquier caso: {diag["y_ademas"][1]}')
 
-        diag = consola.diagnostico(alarma)
-        ui.evidencia_enfrentada(diag["apoyan_cliente"], diag["apoyan_orden"])
-        pastilla = ("p-mal" if diag["clave"] == "error_probable" else
-                    "p-espera" if diag["clave"] != "cambio_documentado"
-                    else "p-acento")
-        st.markdown(
-            ui.pastilla(diag["etiqueta"], pastilla, "◆")
-            + f'&nbsp;&nbsp;<span style="font-size:.87rem;color:var(--tinta-2)">'
-              f'{html.escape(diag["por_que"])}</span>', unsafe_allow_html=True)
-        st.caption(f'Y en cualquier caso: {diag["y_ademas"][1]}')
+    # Lo que su módulo dice de las diferencias pequeñas. Va aquí y no en el
+    # diagnóstico del núcleo porque no es una lectura de la evidencia: es
+    # conocimiento del oficio, y lo pone quien audita.
+    _rev = consola.nota_de_revision(alarma["principal"])
+    if _rev:
+        ui.nota(f'<b>El módulo de auditoría la saca «a revisar», no como '
+                f'incongruencia.</b> {_rev}', tono="espera")
 
-        if len(alarma["discrepancias"]) > 1:
-            st.markdown("**Las demás diferencias del mismo pedido**")
-            st.dataframe(pd.DataFrame([{
-                "Campo": d["etiqueta"],
-                "Dice el cliente": _miles(d["valor_cliente"]),
-                "Dice la orden": _miles(d["valor_orden"]),
-                "Gravedad si se propaga": d["severidad_esperada"],
-            } for d in alarma["discrepancias"]
-                if d is not alarma["principal"]]), use_container_width=True,
-                hide_index=True)
+    if len(alarma["discrepancias"]) > 1:
+        st.markdown("**Las demás diferencias del mismo pedido**")
+        st.dataframe(pd.DataFrame([{
+            "Campo": d["etiqueta"],
+            "Dice el cliente": _miles(d["valor_cliente"]),
+            "Dice la orden": _miles(d["valor_orden"]),
+            "Gravedad si se propaga": d["severidad_esperada"],
+        } for d in alarma["discrepancias"]
+            if d is not alarma["principal"]]), use_container_width=True,
+            hide_index=True)
 
-        st.markdown("**Contraste con la salida del módulo**")
-        st.caption("La salida del módulo se le entrega al sistema; no se va a "
-                   "buscar. Es la frontera declarada de este trabajo.")
-        if "consola_respuesta" not in st.session_state:
-            st.session_state.consola_respuesta = ""
-        c1, c2 = st.columns([1, 3])
-        if c1.button("Cargar la salida del módulo", use_container_width=True,
-                     key="consola_ej"):
-            st.session_state.consola_respuesta = auditoria.EJEMPLO
-        c2.caption("Carga la respuesta real que el módulo de Juan emitió sobre "
-                   "un pedido con esta misma pareja de discrepancias.")
-        resp = st.text_area("Salida", key="consola_respuesta", height=120,
-                            label_visibility="collapsed")
-        an = consola.analisis_incongruencias(alarma, resp)
-        for av in an["avisos"]:
-            st.warning(av)
-        if an["hay_salida"]:
-            obs = an["observacion"]
-            ui.fila_kpis([
-                ui.kpi("Reporta el módulo", str(len(an["reportados"])),
-                       "incidencias"),
-                ui.kpi("Confirmadas", f'{len(obs["vistas"])}/'
-                       f'{len(obs["discrepancias"])}',
-                       "por la lectura propia del sistema", acento=True),
-                ui.kpi("Sin sostener", str(len(obs["inventadas"])),
-                       "no aparecen en los documentos"),
-            ])
-            if not obs["no_vistas"] and not obs["inventadas"]:
-                st.success("El sistema ha leído los documentos por su cuenta y "
-                           "confirma, una a una, las incidencias del módulo. "
-                           "**Nadie tiene que fiarse: se comprueba.**")
+    # Aquí había un cuadro para pegar la salida del módulo de Juan y
+    # contrastarla con la lectura propia del sistema. Se ha quitado de la
+    # consola: en una demostración no aporta nada —nadie va a pegar un JSON
+    # delante de un cliente— y cargaba la pantalla justo donde hay que
+    # entender la evidencia. El contraste sigue existiendo donde le
+    # corresponde, en «Evaluar un módulo», que es la pantalla que sirve
+    # para eso.
 
-    # 2 · Diligencia — el contrato del cliente.
-    with st.expander(f"{a2['nombre']} — {a2['pregunta']}"):
-        st.caption(a2["modulo"])
-        dil = consola.analisis_diligencia(estado["contratos"], date.today())
-        if not dil["aplica"]:
-            ui.nota(dil["motivo"], tono="espera")
-        else:
-            for d in dil["documentos"]:
-                tono = "p-bien" if d["estado"] == "vigente" else "p-mal"
-                st.markdown(
-                    ui.pastilla(d["etiqueta"], tono,
-                                "✓" if d["estado"] == "vigente" else "✕")
-                    + f'&nbsp;&nbsp;<b>{html.escape(d["nombre"])}</b>',
-                    unsafe_allow_html=True)
-                ui.fila_kpis([
-                    ui.kpi("En vigor desde",
-                           d["inicio"].strftime("%d/%m/%Y") if d["inicio"] else "—",
-                           "según el propio documento"),
-                    ui.kpi("Hasta",
-                           d["fin"].strftime("%d/%m/%Y") if d["fin"] else "—",
-                           f'quedan {d["dias"]} días' if d["dias"] is not None
-                           else "sin plazo declarado", acento=True),
-                    ui.kpi("Preaviso",
-                           f'{d["preaviso"]} días' if d["preaviso"] else "—",
-                           "para denunciar el contrato"),
-                ])
-                if d["preaviso_urgente"]:
-                    st.error("**La ventana de preaviso se está cerrando.** Si se "
-                             "quiere denunciar el contrato hay que hacerlo ya.")
-                st.caption(d["por_que"])
-
-    # 3 · Similitud — y aquí el sistema dice que no puede.
-    with st.expander(f"{a3['nombre']} — {a3['pregunta']}"):
-        st.caption(a3["modulo"])
-        sim = consola.analisis_similitud()
-        ui.nota(sim["motivo"], tono="espera")
-        if sim.get("ejemplo"):
-            st.caption(f'Consulta del módulo: {sim["ejemplo"]["consulta"]} · '
-                       f'{sim["ejemplo"]["descartados"]} candidatas descartadas '
-                       f'antes de puntuar.')
-            st.dataframe(pd.DataFrame([{
-                "Posición": r["posicion"], "Proyecto": r["id_proyecto"],
-                "Puntuación": round(r["puntuacion"], 3),
-            } for r in sim["ejemplo"]["resultados"]]),
-                use_container_width=True, hide_index=True)
+    # Aquí venían también «Análisis de diligencia» y «Análisis de similitud»,
+    # cada una en su desplegable. Se han ido al panel de la incidencia, que es
+    # donde ya estaban las tres y desde donde se elige cuál abrir. Tenerlas otra
+    # vez aquí era repetir el índice debajo del capítulo.
 
 
 def pantalla_consola():
@@ -513,7 +507,7 @@ def pantalla_consola():
                 + st.session_state.get("consola_subidos", []))
     estado = consola.arrancar(entrados, auditoria.clasificar)
     resueltas = st.session_state.setdefault("consola_resueltas", set())
-    abiertas = [a for a in estado["alarmas"] if a["etiqueta"] not in resueltas]
+    abiertas = [a for a in estado["alarmas"] if a["id"] not in resueltas]
 
     onto = autoridad.cargar()
     todos = (onto or {}).get("roles", [])
@@ -521,40 +515,125 @@ def pantalla_consola():
     # suele ser el director general, y además así el primer intento enseña el
     # escalón que hay que enseñar.
     roles = [r["rol"] for r in sorted(todos, key=lambda r: -r["nivel"])]
-    operario = st.session_state.get("consola_rol") or (roles[0] if roles else None)
+    yo = identidad.ficha(st.session_state.get("consola_usuario"))
+    operario = (yo or {}).get("rol") or st.session_state.get("consola_rol") \
+        or (roles[0] if roles else None)
 
     # ------------------------------------------------- 1 · ENTRADA DEL USUARIO
     #
-    # La pantalla 1 del guion de Fabián. Va antes que nada porque su comprensión
-    # es «la aplicación sabe quién soy y qué puedo hacer», y eso no se puede
-    # enseñar después de haber visto ya media aplicación.
+    # La pantalla 1 del guion de Fabián, y ahora con usuario y contraseña.
+    #
+    # Antes había aquí un desplegable de roles. Se entendía, pero se entendía
+    # como lo que era —un menú de la demostración—, y eso contamina todo lo que
+    # viene detrás: si el rol se elige de una lista, el permiso que el sistema
+    # aplica más tarde parece elegido también. Una puerta con usuario y
+    # contraseña no añade seguridad ninguna (ver `demo/identidad.py`), pero
+    # cambia quién manda en la frase: ya no es «elijo ser director», es «soy
+    # Jorge Hernández y la aplicación sabe lo que eso significa».
     if not st.session_state.get("consola_dentro"):
         st.markdown(
             '<div class="hero"><div class="eyebrow">GraphyCems · entrada</div>'
-            '<h1>Identifícate para entrar en la consola</h1>'
-            '<div class="meta">La identidad, el rol y los permisos no se '
-            'infieren: se leen de la ontología de la empresa, y de ellos '
-            'depende qué vas a poder hacer con lo que encuentres.</div></div>',
-            unsafe_allow_html=True)
-        ui.naturaleza(naturaleza.capas_de("sesion"))
+            '<h1>Inicia sesión</h1>'
+            '<div class="meta">La identidad, el puesto y los permisos no se '
+            'infieren ni se eligen: se leen de la ontología de la empresa, y de '
+            'ellos depende qué vas a poder hacer con lo que encuentres.</div>'
+            '</div>', unsafe_allow_html=True)
         if not roles:
             st.error("No hay organigrama cargado: sin él no se puede saber quién "
                      "es nadie ni qué puede hacer.")
             st.stop()
-        elegido = st.selectbox(
-            "Entra como", roles, key="consola_rol",
-            format_func=lambda n: next(
-                f'{r["rol"]} — nivel {r["nivel"]}, {r["area"]}'
-                for r in todos if r["rol"] == n))
-        ficha = next(r for r in todos if r["rol"] == elegido)
-        ui.ficha_sesion(
-            ficha["rol"], f'{ficha["nivel"]} · {ficha["tipo_de_autoridad"]}',
-            ficha["area"], "GraphyCems", ficha["manda_sobre"],
-            (f'{memoria.resumen()["decisiones"]} decisiones registradas en el '
-             f'sistema') if memoria.resumen()["decisiones"] else
-            "sin actividad registrada todavía")
-        st.button("Entrar", type="primary", key="consola_entrar",
-                  on_click=lambda: st.session_state.update(consola_dentro=True))
+
+        c_form, c_lado = st.columns([3, 2])
+        with c_form.form("consola_login", border=True):
+            usuario = st.text_input("Usuario", key="login_usuario",
+                                    placeholder="encargado.turno")
+            clave = st.text_input("Contraseña", type="password",
+                                  key="login_clave")
+            enviado = st.form_submit_button("Entrar", type="primary",
+                                            use_container_width=True)
+        if enviado:
+            quien, motivo = identidad.entrar(usuario, clave)
+            if not quien:
+                c_form.error(motivo)
+            else:
+                st.session_state.consola_usuario = quien["usuario"]
+                st.session_state.consola_dentro = True
+                st.rerun()
+
+        with c_lado:
+            ui.naturaleza(naturaleza.capas_de("sesion"))
+
+        # La contraseña, a la vista. Esconderla en una demostración sugiere un
+        # control de acceso que no existe; enseñarla deja claro qué es esto.
+        with st.expander("Usuarios de la demostración"):
+            st.caption(f'Esto **no es autenticación**: es la puerta de la '
+                       f'demostración. La contraseña es `{identidad.CLAVE}` para '
+                       f'todos. Lo que sí es real es lo que ocurre al pasar: el '
+                       f'puesto y los permisos salen de la ontología, no de '
+                       f'aquí.')
+            st.dataframe(
+                pd.DataFrame([{
+                    "Usuario": p["usuario"], "Puesto": p["puesto"],
+                    "Fila de la matriz de autoridad": p["rol"],
+                } for p in identidad.usuarios()]),
+                hide_index=True, use_container_width=True)
+            st.caption("No hay nombres de personas: el usuario **es el puesto**. "
+                       "La autoridad la lleva el puesto, no quien lo ocupa — la "
+                       "matriz de Pablo no dice que fulano pueda validar, dice "
+                       "que los Encargados de Turno pueden.")
+            st.caption("Para ver los dos escalones de la decisión: entra como "
+                       "**encargado.turno** (propone) y después como "
+                       "**ingeniero.jefe** (valida y cierra).")
+        return
+
+    # ----------------------------------------------- EL REGISTRO DE ACTIVIDAD
+    #
+    # Pantalla propia, y no una sección más dentro del puesto.
+    #
+    # Es un sitio al que se va a mirar, no algo que se lee de paso: «¿qué se ha
+    # hecho aquí desde ayer?», «¿quién tocó este pedido?». Metido debajo de la
+    # ficha del puesto obligaba a pasarlo por encima cada vez que alguien entra
+    # a subir documentos, y lo que se pasa por encima deja de leerse.
+    #
+    # Va antes que la recepción para que se pueda abrir desde cualquier punto
+    # del recorrido sin perder lo que haya en marcha: la cola, las propuestas a
+    # medias y la sesión siguen exactamente donde estaban al volver.
+    if st.session_state.get("consola_pantalla") == "registro":
+        acciones = memoria.historial()
+        mem = memoria.resumen()
+        st.markdown(
+            '<div class="hero"><div class="eyebrow">GraphyCems · registro</div>'
+            '<h1>Registro de actividad</h1>'
+            '<div class="meta">Todo lo que se ha hecho sobre incidencias, lo '
+            'más reciente primero: quién lo propuso o lo cerró, qué decidió, '
+            'cuándo y por qué. Las propuestas cuentan — alguien miró la '
+            'incidencia y dijo qué haría, aunque no pudiera cerrarla.</div>'
+            '</div>', unsafe_allow_html=True)
+
+        ui.franja_cifras([
+            (mem["acciones"], "acciones registradas"),
+            (mem["propuestas"], "propuestas"),
+            (mem["decisiones"], "decisiones cerradas"),
+            (mem["criterios"], "criterios guardados"),
+        ])
+
+        c_vol, c_ver, _ = st.columns([2, 2, 1])
+        if c_vol.button("← Volver a la consola", type="primary",
+                        use_container_width=True, key="reg_volver"):
+            st.session_state.consola_pantalla = "consola"
+            st.rerun()
+        solo_criterios = c_ver.toggle("Ver sólo los criterios guardados",
+                                      key="reg_solo_criterios")
+
+        ui.registro_actividad(
+            [a for a in acciones if a.get("es_criterio")] if solo_criterios
+            else acciones)
+
+        if acciones:
+            st.caption("Un criterio vuelve la próxima vez que aparezca una "
+                       "incidencia de la misma clase sobre el mismo tipo de "
+                       "documento. Una excepción y una propuesta, no: constan y "
+                       "se quedan aquí.")
         return
 
     # --------------------------------------------- 2 · RECEPCIÓN Y PROCESAMIENTO
@@ -572,12 +651,56 @@ def pantalla_consola():
     if (st.session_state.get("consola_pantalla") == "recepcion"
             or not (recibidos or st.session_state.get("consola_subidos"))):
         st.markdown(
-            '<div class="hero"><div class="eyebrow">GraphyCems · recepción</div>'
-            '<h1>Entrada de documentación</h1>'
-            '<div class="meta">Así es como entra el trabajo: por tandas, según '
-            'la manda el cliente o la genera producción. El sistema las lee, '
-            'agrupa por pedido y contrasta cada grupo consigo mismo.</div></div>',
-            unsafe_allow_html=True)
+            '<div class="hero"><div class="eyebrow">GraphyCems · puesto de '
+            'trabajo</div><h1>Tu puesto</h1>'
+            '<div class="meta">Lo primero que ve quien entra no es una bandeja: '
+            'es su sitio en la empresa. De ahí sale lo que podrá hacer más '
+            'tarde con una alarma, y por eso va antes que la alarma.</div>'
+            '</div>', unsafe_allow_html=True)
+
+        # --- Quién eres ---------------------------------------------------
+        if yo:
+            ui.ficha_puesto(yo)
+            if not yo["rol_en_la_matriz"]:
+                ui.nota(
+                    f'<b>Este puesto no tiene fila en la matriz de autoridad.</b> '
+                    f'«{html.escape(yo["rol"])}» aparece en la ficha de puesto '
+                    f'pero no entre los ocho roles que reparten el mando, así '
+                    f'que el sistema no sabe qué le deja hacer. No es que no '
+                    f'pueda: es que no consta, y son dos cosas distintas.',
+                    tono="espera")
+            st.markdown("**Lo que este puesto puede y lo que no**")
+            st.caption("No está escrito a mano en ningún sitio: por cada área se "
+                       "le pregunta a la ontología si este rol puede proponer y "
+                       "si puede validar, y la respuesta se coloca donde "
+                       "corresponde.")
+            ui.permisos_del_puesto(yo["permisos"])
+
+            # --- El organigrama de Pablo, en su propia pestaña --------------
+            #
+            # Aparte y no incrustado. Dentro de la consola quedaba un `iframe`
+            # con scroll propio dentro del scroll de la página, que proyectado
+            # no se lee; y además el organigrama se consulta y se cierra, no se
+            # trabaja en él. Abierto en otra pestaña se mira entero y la consola
+            # sigue exactamente donde estaba al volver.
+            url = identidad.url_organigrama(yo["usuario"])
+            if url:
+                st.markdown(
+                    f'<a class="boton-enlace" href="{html.escape(url)}" '
+                    f'target="_blank" rel="noopener">Ver el organigrama del '
+                    f'área ↗</a>', unsafe_allow_html=True)
+                st.caption("Se abre en otra pestaña, tal como lo entregó Pablo y "
+                           "sin tocarle una coma. La tarjeta central se da la "
+                           "vuelta al pulsarla: detrás está el equipo que "
+                           "depende de este puesto.")
+            ui.naturaleza(naturaleza.capas_de("sesion"), pie=False)
+            st.divider()
+
+        # --- Y lo que entra por la puerta ---------------------------------
+        st.markdown("### Entrada de documentación")
+        st.caption("Así es como entra el trabajo: por tandas, según la manda el "
+                   "cliente o la genera producción. El sistema las lee, agrupa "
+                   "por pedido y contrasta cada grupo consigo mismo.")
         ui.naturaleza(naturaleza.capas_de("procesamiento"))
 
         if recibidos or st.session_state.get("consola_subidos"):
@@ -628,6 +751,17 @@ def pantalla_consola():
                               consola_pantalla="consola"))
             else:
                 st.info("Sube los documentos de un pedido para empezar.")
+            c_reg, c_sal, _ = st.columns([2, 2, 1])
+            if c_reg.button(f'Registro de actividad '
+                            f'({len(memoria.historial())})',
+                            use_container_width=True, key="rec_registro"):
+                st.session_state.consola_pantalla = "registro"
+                st.rerun()
+            if c_sal.button("Cerrar sesión", use_container_width=True,
+                            key="rec_salir"):
+                st.session_state.consola_dentro = False
+                st.session_state.pop("consola_usuario", None)
+                st.rerun()
             return
 
         # --- «Auditando documentos…»
@@ -710,7 +844,7 @@ def pantalla_consola():
     ui.barra_consola(
         "GraphyCems · Consola de control",
         f'En marcha · {estado["documentos"]} documentos leídos',
-        operario)
+        yo["puesto"] if yo else operario)
 
     mem = memoria.resumen()
     ui.franja_cifras([
@@ -723,10 +857,25 @@ def pantalla_consola():
     # Se puede volver a recepción en cualquier momento. Es lo que convierte la
     # demo en un sistema: metes otra tanda y la alarma salta delante de quien
     # está mirando, en vez de haber estado ahí desde el principio.
-    c_rec, _ = st.columns([2, 3])
+    c_rec, c_reg, c_sal = st.columns([2, 2, 2])
     if c_rec.button("Entra más documentación", use_container_width=True,
                     key="ir_recepcion"):
         st.session_state.consola_pantalla = "recepcion"
+        st.rerun()
+    if c_reg.button(f'Registro de actividad ({len(memoria.historial())})',
+                    use_container_width=True, key="ir_registro"):
+        st.session_state.consola_pantalla = "registro"
+        st.rerun()
+    # Cerrar sesión NO borra lo auditado ni las propuestas a medias: sólo
+    # cambia quién está delante. Es lo que permite enseñar el escalón de
+    # autoridad de verdad —el encargado propone, sale, y entra el director a
+    # cerrar— en vez de simularlo cambiando una opción de un menú.
+    if c_sal.button(f'Cerrar sesión ({(yo or {}).get("puesto", operario)})',
+                    use_container_width=True, key="consola_salir"):
+        st.session_state.consola_dentro = False
+        st.session_state.pop("consola_usuario", None)
+        st.session_state.pop("consola_alarma", None)
+        st.session_state.pop("consola_vista", None)
         st.rerun()
     for a in avisos:
         st.info(a)
@@ -736,7 +885,7 @@ def pantalla_consola():
     # cerrara sola se perdería justo el momento que hay que ver — el pedido
     # respondiendo ya con el valor decidido.
     activa = st.session_state.get("consola_alarma")
-    if activa and activa not in [a["etiqueta"] for a in estado["alarmas"]]:
+    if activa and activa not in [a["id"] for a in estado["alarmas"]]:
         activa = st.session_state.consola_alarma = None
 
     # ------------------------------------------------------------- LA COLA
@@ -744,29 +893,36 @@ def pantalla_consola():
         # El marcador del guion: «4 correctos · 1 incidencia». Dice de un
         # vistazo que el sistema no avisa de todo lo que mira.
         st.markdown(
-            f'**{len(estado["limpios"]) + len(resueltas)} correctos · '
-            f'{len(abiertas)} incidencia(s)** — el sistema ha contrastado los '
-            f'{estado["pedidos"]} pedidos que había en la bandeja.')
+            f'**{len(estado["limpios"])} pedido(s) correcto(s) · '
+            f'{len(abiertas)} incidencia(s) abierta(s)** — el sistema ha '
+            f'contrastado los {estado["pedidos"]} pedidos que había en la '
+            f'bandeja'
+            + (f' y ya se han resuelto {len(resueltas)}.' if resueltas else '.'))
         ui.naturaleza(naturaleza.capas_de("vigilancia"))
-        st.markdown("### Alarmas abiertas")
+        st.markdown("### Incidencias abiertas")
+        st.caption("Una fila por incongruencia, no por pedido. Un pedido puede "
+                   "traer dos diferencias que no se deciden igual: una cantidad "
+                   "diez veces mayor hay que corregirla, y diez gramos de más en "
+                   "la cubierta puede darlos por buenos quien manda.")
         if not abiertas:
-            st.success("No queda ninguna alarma abierta. El sistema sigue "
+            st.success("No queda ninguna incidencia abierta. El sistema sigue "
                        "leyendo lo que entre.")
         for a in abiertas:
             p = a["principal"]
             imp = flujo.impacto(p)
+            nota_rev = consola.nota_de_revision(p)
             ui.tarjeta_alarma(
-                p.get("severidad_esperada", "—").upper(),
-                f'Pedido {a["etiqueta"]} · {a["n"]} documentos',
+                consola.etiqueta_severidad(p),
+                f'Pedido {a["etiqueta"]} · {p["etiqueta"].lower()}',
                 f'{p["etiqueta"]}: el cliente pide {_miles(p["valor_cliente"])} '
                 f'y la orden manda fabricar {_miles(p["valor_orden"])}',
                 (f'**{_miles(imp["exceso"])} unidades de más**, '
                  f'{imp["veces"]:g} veces lo pedido.' if imp else "")
-                + (f' Y {len(a["discrepancias"]) - 1} diferencia(s) menor(es) '
-                   f'en el mismo pedido.' if len(a["discrepancias"]) > 1 else ""))
-            if st.button(f'Atender la alarma del pedido {a["etiqueta"]}',
-                         key=f'atender_{a["etiqueta"]}', type="primary"):
-                st.session_state.consola_alarma = a["etiqueta"]
+                + (f' {nota_rev}' if nota_rev else ""),
+                revisar=bool(nota_rev))
+            if st.button(f'Atender · {a["etiqueta"]} · {p["etiqueta"].lower()}',
+                         key=f'atender_{a["id"]}', type="primary"):
+                st.session_state.consola_alarma = a["id"]
                 st.session_state.pop("consola_vista", None)
                 st.rerun()
 
@@ -800,9 +956,9 @@ def pantalla_consola():
         return
 
     # -------------------------------------------- EL DASHBOARD DE LA ALARMA
-    alarma = next(a for a in estado["alarmas"] if a["etiqueta"] == activa)
-    resultado = st.session_state.get(f'resultado_{alarma["etiqueta"]}')
-    ya_cerrada = alarma["etiqueta"] in resueltas
+    alarma = next(a for a in estado["alarmas"] if a["id"] == activa)
+    resultado = st.session_state.get(f'resultado_{alarma["id"]}')
+    ya_cerrada = alarma["id"] in resueltas
     principal = alarma["principal"]
     imp = flujo.impacto(principal)
 
@@ -811,37 +967,80 @@ def pantalla_consola():
         st.session_state.pop("consola_vista", None)
         st.rerun()
 
+    # --------------------------------------- LOS MÓDULOS QUE NO ESTÁN AQUÍ
+    #
+    # Se abren y no enseñan nada, que es exactamente lo que hay. La tentación
+    # sería pintarles una pantalla plausible —cuatro contratos, un ranking de
+    # trabajos parecidos— y sería la mentira más barata de toda la demostración:
+    # cualquiera que preguntara «¿y esto sale de vuestro módulo?» se llevaría un
+    # «no» después de haberlo visto funcionar. Esto es un demostrador del
+    # recorrido, no de los módulos de Martín y de Álvaro, y se dice.
+    vista = st.session_state.get("consola_vista")
+    if vista in ("diligencia", "similitud"):
+        ficha_an = next(a for a in consola.ANALISIS if a["id"] == vista)
+        st.markdown(f'### {ficha_an["nombre"]}')
+        st.caption(f'{ficha_an["modulo"]} · {ficha_an["pregunta"]}')
+        ui.nota(
+            f'<b>Este módulo no está conectado en el demostrador.</b> '
+            f'La pantalla está vacía a propósito: el recorrido que se enseña '
+            f'aquí es el de la incidencia de pedidos, y llenar ésta con datos '
+            f'de ejemplo daría a entender que {html.escape(ficha_an["modulo"].split(" · ")[1])} '
+            f'ya responde desde dentro de la consola, que no es el caso.',
+            tono="espera")
+        st.caption("Lo que este bloque sí ha medido de ese módulo está en "
+                   "«Evaluar un módulo», con sus casos y su veredicto.")
+        st.button("← Volver al panel", key=f"volver_{vista}", type="primary",
+                  on_click=lambda: st.session_state.update(consola_vista=None))
+        return
+
     # ------------------------------------------- 4 · EL PANEL DE HERRAMIENTAS
     #
     # Atender una alarma no lleva directamente al detalle: lleva al panel. Ver
     # las tres herramientas juntas —y ver que dos de ellas no aplican a este
     # caso— es lo que hace entender la frase de Fabián: «tengo un centro de
     # control único, no seis aplicaciones independientes».
-    if st.session_state.get("consola_vista") != "detalle" and not ya_cerrada:
+    if vista != "detalle" and not ya_cerrada:
         st.markdown(f'### Panel de la incidencia · pedido {alarma["etiqueta"]}')
         ui.naturaleza(naturaleza.capas_de("panel"))
         st.caption("Las tres herramientas del equipo, con lo que cada una sabe "
                    "de este caso. El sistema ya ha elegido cuál le corresponde.")
-        ui.cuadros_herramientas(consola.cuadros_del_caso(alarma, estado))
-        c1, c2 = st.columns([2, 3])
-        if c1.button("Abrir Auditoría de pedidos", type="primary",
-                     use_container_width=True, key="abrir_auditoria"):
-            st.session_state.consola_vista = "detalle"
-            st.rerun()
-        c2.caption("Es la que le corresponde a esta incidencia: una discrepancia "
-                   "entre la orden de fabricación y la documentación de cliente "
-                   "del mismo pedido.")
+        # Las TRES se pueden abrir, no sólo la que toca.
+        #
+        # Un panel donde únicamente se puede pulsar el cuadro que el sistema ha
+        # elegido no es un centro de control: es un pasillo con una puerta y dos
+        # fotos de puertas. Que las tres se abran es lo que demuestra que había
+        # dónde elegir y que eligió el sistema.
+        #
+        # Tarjeta y botón van en la MISMA columna a propósito: el CSS los cose
+        # para que se lean —y reaccionen al ratón— como una sola pieza
+        # pulsable. Por eso no se llama aquí a `ui.cuadros_herramientas()`, que
+        # pinta las tres seguidas y dejaría los botones sueltos debajo.
+        cuadros = consola.cuadros_del_caso(alarma, estado)
+        for col, c in zip(st.columns(len(cuadros)), cuadros):
+            with col:
+                ui.cuadro_herramienta(c)
+                etiqueta = c["nombre"].replace("Análisis de ", "").capitalize()
+                if st.button(f'Abrir {etiqueta}',
+                             type="primary" if c.get("activo") else "secondary",
+                             use_container_width=True,
+                             key=f'abrir_{c["id"]}'):
+                    st.session_state.consola_vista = (
+                        "detalle" if c["id"] == "incongruencias" else c["id"])
+                    st.rerun()
+        st.caption("El color distingue **la herramienta**, no el resultado: las "
+                   "tres se pueden abrir. La de Auditoría de pedidos va "
+                   "destacada porque es la que le corresponde a esta "
+                   "incidencia — una discrepancia entre la orden de fabricación "
+                   "y la documentación de cliente del mismo pedido.")
         return
 
-    ui.naturaleza(naturaleza.capas_de("panel"), pie=False)
     ui.aviso_incidencia(
         f'Pedido {alarma["etiqueta"]}: la orden manda fabricar '
         f'{_miles(principal["valor_orden"])} de los '
         f'{_miles(principal["valor_cliente"])} que pidió el cliente'
         if imp else f'Pedido {alarma["etiqueta"]}: {principal["etiqueta"]}',
-        "Nadie ha pedido que se revise este pedido. El sistema lo encontró al "
-        "contrastar la orden de fabricación con la documentación de cliente, "
-        "mientras despachaba el resto de la bandeja sin molestar a nadie.")
+        "Nadie ha pedido que se revise este pedido: el sistema lo encontró al "
+        "contrastar la orden con la documentación de cliente.")
 
     ui.enfrentar(
         {"que": "Pidió el cliente", "valor": _miles(principal["valor_cliente"]),
@@ -851,31 +1050,34 @@ def pantalla_consola():
          "fuente": next((d["nombre"] for d in alarma["documentos"]
                          if d["tipo"] == "orden"), "")})
 
-    if imp:
-        with st.expander("Ponerle precio (opcional)"):
-            st.caption("El sistema no se inventa el coste. Si quieres verlo en "
-                       "euros, escribe tú el coste unitario.")
-            cu = st.number_input("Coste unitario (€)", min_value=0.0, step=0.10,
-                                 value=0.0, key="consola_coste")
-            if cu:
-                st.metric("Coste de fabricar lo que nadie pidió",
-                          f'{flujo.impacto(principal, cu)["coste"]:,.2f} €'
-                          .replace(",", "."))
+    # Aquí había un desplegable para escribir un coste unitario y ver el
+    # importe de lo que se iba a fabrircar de más. Se ha quitado de la consola:
+    # es un cálculo opcional que nadie usa delante de un cliente y metía un
+    # campo de entrada justo entre la evidencia y la decisión, que son las dos
+    # cosas que esta pantalla tiene que dejar claras.
 
     # --- Ontología: quién eres y qué te deja hacer esta alarma -------------
     st.markdown("#### Quién está al mando")
-    ui.naturaleza(naturaleza.capas_de("autoridad"))
-    c1, c2 = st.columns([2, 1])
-    rol = c1.selectbox(
-        "Operario", roles, key="consola_rol",
-        index=roles.index(operario) if operario in roles else 0,
-        label_visibility="collapsed")
-    with c2.popover("Ver el organigrama", use_container_width=True):
-        st.caption("La ontología de la empresa. De aquí sale si tu puesto puede "
-                   "cerrar esta alarma o sólo proponer.")
+    # El operario ya NO se elige de una lista: es quien ha iniciado sesión.
+    #
+    # Es el cambio que hace creíble el escalón. Con un desplegable, pasar de
+    # encargado a director era cambiar una opción; con la sesión iniciada hay
+    # que salir y entrar como otra persona, que es exactamente lo que pasa en
+    # una planta cuando el encargado no puede cerrar algo y avisa a su jefe. La
+    # propuesta y su justificación siguen ahí cuando el director entra.
+    rol = operario
+    # Aquí iba además `ui.sesion_iniciada()`, que decía «Encargados de Turno,
+    # nivel 3, Área de Producción, puede proponer pero no cerrar» — y justo
+    # debajo `ui.contexto_del_operario()` volvía a decir lo mismo repartido en
+    # tres cajas. Enseñar un dato dos veces seguidas no lo refuerza: hace dudar
+    # de si son dos datos distintos.
+    with st.popover("Ver el organigrama"):
         ui.mapa_organizativo(onto, "consola",
                              consola.categoria_de(alarma), autoridad)
 
+    # Sin `persona`: aquí no hay personas, hay puestos, y la firma que queda en
+    # el registro tiene que ser la fila de la matriz — que es lo único que
+    # sostiene que quien cerró podía cerrar.
     ctx = consola.contexto_operario(rol, alarma, onto)
     ui.contexto_del_operario(ctx)
 
@@ -908,18 +1110,51 @@ def pantalla_consola():
             + ([f'Revisada antes por **{r["propuesta_por"]}**, que está en el '
                 f'área pero no manda sobre ella.']
                if r.get("propuesta_por") else [])
-            + [f'Cerrada por **{r.get("cerrada_por", ctx["rol"])}**, con '
-               f'autoridad declarada sobre {ctx["area_afectada"]}.',
-               'Registrada en la memoria: la próxima alarma de esta clase '
-               'llegará con este precedente puesto.'])
+            + [f'Cerrada por **{r.get("cerrada_por", ctx["quien"])}**, con '
+               f'autoridad declarada sobre {ctx["area_afectada"]}.']
+            + ['Guardada como **criterio**: la próxima incidencia de esta clase '
+               'llegará con esta decisión puesta.' if r.get("es_criterio") else
+               'Guardada como **excepción**: consta en el historial y no se '
+               'propondrá en los siguientes casos.'])
 
         if r.get("registro"):
-            st.markdown("**El criterio que queda guardado**")
+            st.markdown("**Lo que queda guardado de esta decisión**")
             st.caption("Dos mitades, y las dos hacen falta. La izquierda permite "
                        "auditar la decisión dentro de seis meses; la derecha "
-                       "permite saber si el criterio **aplica** a un caso nuevo. "
-                       "Un precedente sin condiciones es una regla disfrazada.")
+                       "permite saber si **aplica** a un caso nuevo. Un "
+                       "precedente sin condiciones es una regla disfrazada.")
             ui.registro_criterio(r["registro"])
+
+        # ------------------------------------------ LAS DOS LISTAS DEL CIERRE
+        #
+        # Historial y memoria, separados y a la vista. Arriba, todo lo que se ha
+        # cerrado —qué pasó—; abajo, sólo lo que alguien marcó como criterio
+        # —qué se aprendió—. Es la pantalla 8 de Fabián con la distinción que su
+        # guion no hace: él da por guardado todo lo que se valida, y así una
+        # excepción se convertiría en regla sin que nadie lo haya querido.
+        st.divider()
+        mem = memoria.resumen()
+        todo = memoria.historial()
+        st.markdown(f'### Registro de actividad · {len(todo)}')
+        st.caption("Todo lo que se ha hecho sobre incidencias —propuesto y "
+                   "cerrado—, con su autor, su hora y su motivo. Las "
+                   "excepciones también: cerrar una incidencia siempre deja "
+                   "rastro, aunque no deje criterio.")
+        ui.registro_actividad(todo, limite=8)
+
+        st.markdown(f'### Criterios guardados · {mem["criterios"]}')
+        st.caption(f'De las {mem["decisiones"]} decisiones cerradas, '
+                   f'{mem["criterios"]} se marcaron para volver y '
+                   f'{mem["excepciones"]} se quedaron como excepción. Sólo las '
+                   f'primeras reaparecen — y como recomendación, no como orden: '
+                   f'sigue decidiendo quien tiene autoridad.')
+        if mem["criterios"]:
+            ui.panel_memoria(mem)
+        else:
+            ui.nota("Todavía no hay ningún criterio guardado. Todo lo cerrado "
+                    "hasta ahora se ha decidido caso por caso, así que la "
+                    "próxima incidencia parecida llegará igual de vacía que "
+                    "ésta.", tono="espera")
 
         st.button("← Volver a la cola", key="consola_volver_pie",
                   type="primary",
@@ -928,15 +1163,12 @@ def pantalla_consola():
         return
 
     st.markdown("#### Actuación")
-    ui.naturaleza(naturaleza.capas_de("decision"))
     posibles = consola.acciones_para(ctx)
-    st.caption("Sólo aparecen las acciones que tu puesto permite. Un botón que "
-               "no se puede pulsar no se enseña apagado: se sustituye por el que "
-               "sí corresponde.")
+    st.caption("Sólo aparecen las acciones que tu puesto permite.")
 
-    propuesta = st.session_state.get(f'propuesta_{alarma["etiqueta"]}')
+    propuesta = st.session_state.get(f'propuesta_{alarma["id"]}')
     if propuesta:
-        just_previa = st.session_state.get(f'just_{alarma["etiqueta"]}')
+        just_previa = st.session_state.get(f'just_{alarma["id"]}')
         ui.nota(f'<b>Ya revisada por {html.escape(propuesta)}</b>, pendiente de '
                 f'validación. Es el aviso que salta en el módulo de Mencía '
                 f'cuando entra alguien con autoridad.'
@@ -949,7 +1181,7 @@ def pantalla_consola():
     # encargado propone y justifica»— y el sistema no registra sin ella.
     justificacion = st.text_area(
         "Por qué decides esto", height=80,
-        key=f'entrada_just_{alarma["etiqueta"]}',
+        key=f'entrada_just_{alarma["id"]}',
         placeholder="El pedido y el presupuesto coinciden en 3.000; la orden "
                     "lleva un cero de más.")
     if sug and sug.get("ultimo", {}).get("justificacion"):
@@ -958,30 +1190,72 @@ def pantalla_consola():
 
     valor = None
     if "corregir" in posibles:
-        with st.expander("Corregir con otro valor"):
+        # Abierto, no plegado: «Corregir» es el botón que más se pulsa en la
+        # demostración y el valor es obligatorio. Un campo obligatorio
+        # escondido detrás de un desplegable sólo produce el error.
+        with st.expander("Corregir con otro valor", expanded=True):
             valor = st.text_input(
                 f'{principal["etiqueta"]} correcta', key="consola_valor",
                 placeholder=str(principal["valor_cliente"]))
 
+    # --- ¿Esto vale sólo para hoy, o vale para la próxima? ------------------
+    #
+    # La pregunta que convierte la memoria en una decisión en vez de un efecto
+    # secundario. El guion de Fabián da por hecho que el criterio «ya se ha
+    # guardado al validar», automático; y automático significa que una excepción
+    # —«esta vez lo dejamos pasar»— se guardaría como regla, y la próxima vez el
+    # sistema recomendaría hacer una excepción. Un contrasentido.
+    #
+    # Sólo sale en las aceptaciones. Aceptar es decir «esta diferencia está
+    # bien», y eso es lo que se puede generalizar; corregir a un tercer valor
+    # resuelve este caso y no dice nada de los siguientes.
+    #
+    # Y sólo se le pregunta a quien PUEDE CERRAR. El criterio nace al cerrar:
+    # ofrecérselo a quien únicamente propone sería pedirle que decida algo que
+    # su propuesta no decide — el sistema lo ignoraría, y una casilla que se
+    # ignora es peor que no estar. Quien propone deja su motivo; quien cierra
+    # decide si ese motivo vale para la próxima.
+    es_criterio = False
+    if ctx["puede_validar"] and any(a in consola.ACEPTACIONES for a in posibles):
+        ctxc = consola.contexto_del_caso(alarma)
+        es_criterio = st.checkbox(
+            f'Dejarlo marcado para próximas incidencias de '
+            f'{principal["etiqueta"].lower()} en {ctxc.get("tipo_documento", "este tipo de documento")}',
+            key=f'criterio_{alarma["id"]}')
+        st.caption(
+            "Marcado, la próxima incongruencia de esta clase sobre el mismo "
+            "tipo de documento llegará con esta decisión puesta como "
+            "recomendación — y seguirá decidiendo quien tenga autoridad. Sin "
+            "marcar queda como **excepción**: consta en el historial y no "
+            "vuelve." if not es_criterio else
+            f'Se guardará con sus condiciones de aplicación: cliente '
+            f'«{ctxc.get("cliente", "—")}» y {ctxc.get("tipo_documento", "—")}. '
+            f'Fuera de esas condiciones no se ofrecerá.')
+    elif any(a in consola.ACEPTACIONES for a in posibles):
+        st.caption("Si esta decisión debe valer para las próximas, lo marcará "
+                   "quien la cierre: el criterio nace al validar, no al "
+                   "proponer. Tu justificación viaja con la propuesta.")
+
     cols = st.columns(len(posibles))
     for col, acc in zip(cols, posibles):
-        etiqueta, _ = consola.ACCIONES[acc]
+        etiqueta = consola.etiqueta_accion(acc, ctx)
         if col.button(etiqueta, key=f'acc_{acc}', use_container_width=True,
                       type="primary" if acc == "aceptar" else "secondary"):
             r = consola.actuar(alarma, acc, ctx, valor, propuesta,
-                               justificacion=justificacion)
-            r["cerrada_por"] = ctx["rol"]
-            st.session_state[f'resultado_{alarma["etiqueta"]}'] = r
+                               justificacion=justificacion,
+                               es_criterio=es_criterio)
+            r["cerrada_por"] = ctx["quien"]
+            st.session_state[f'resultado_{alarma["id"]}'] = r
             if r["cerrada"]:
-                st.session_state.consola_resueltas = resueltas | {alarma["etiqueta"]}
+                st.session_state.consola_resueltas = resueltas | {alarma["id"]}
             elif r.get("propuesta_por"):
-                st.session_state[f'propuesta_{alarma["etiqueta"]}'] = r["propuesta_por"]
-                st.session_state[f'just_{alarma["etiqueta"]}'] = r.get("justificacion")
+                st.session_state[f'propuesta_{alarma["id"]}'] = r["propuesta_por"]
+                st.session_state[f'just_{alarma["id"]}'] = r.get("justificacion")
             st.rerun()
 
-    r = st.session_state.get(f'resultado_{alarma["etiqueta"]}')
+    r = st.session_state.get(f'resultado_{alarma["id"]}')
     if r and not r["cerrada"]:
-        if r.get("falta_justificacion"):
+        if r.get("falta_justificacion") or r.get("falta_valor"):
             st.error(f'**No se ha registrado nada.** {r["mensaje"]}')
         else:
             ui.nota(r["mensaje"], tono="espera")

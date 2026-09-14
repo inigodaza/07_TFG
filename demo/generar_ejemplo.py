@@ -8,13 +8,12 @@ versionan, así que en un despliegue limpio la demo no tenía con qué arrancar:
 pedía documentos y ahí se quedaba. Una demo que sólo funciona en el portátil de
 quien la escribió no es una demo.
 
-Esto fabrica **tres pedidos completos y un contrato marco**, inventados de
+Esto fabrica **dos pedidos completos y un contrato marco**, inventados de
 principio a fin —editorial, títulos e ISBN no existen— con la misma estructura
 que los reales:
 
     Pedido 90001 · limpio            presupuesto + pedido de cliente + orden
-    Pedido 90002 · 30.000 de 3.000   presupuesto + pedido de cliente + orden
-    Pedido 90003 ·  8.000 de   800   presupuesto + pedido de cliente + orden
+    Pedido 90002 · dos diferencias   presupuesto + pedido de cliente + orden
     expediente   · contrato marco del cliente, vigente hasta 2027
 
 Tres cosas distintas dependen de esta bandeja, y por eso es así:
@@ -146,13 +145,19 @@ que en el mismo se indique.
 """
 
 
-# Los tres pedidos de la bandeja.
+# Los dos pedidos de la bandeja.
 #
-# Dos de ellos llevan **la misma clase de error** —un cero de más en la
-# cantidad— y eso no es repetición: es lo que permite enseñar la memoria. Al
-# resolver el primero, el sistema registra la decisión; cuando aparece el
-# segundo, la reconoce y ofrece el precedente. Con un solo caso no habría nada
-# que recordar.
+# Dos pedidos, y el segundo con DOS diferencias que no se deciden igual. Es la
+# pareja del caso real 42805: una cantidad diez veces mayor —que hay que
+# corregir— y una cubierta diez gramos más gruesa, que el módulo de auditoría
+# saca «a revisar» porque podría ser el redondeo estándar de la casa.
+#
+# Hubo un tercer pedido, el 90003, que repetía el error de cantidad (8.000 de
+# 800) para poder enseñar el precedente volviendo. Se ha quitado: era inventado
+# de principio a fin y no se parecía a nada que Juan haya visto. El precio de
+# quitarlo es que en la bandeja de ejemplo ya no hay un segundo caso de la misma
+# clase, así que el criterio se puede ver GUARDARSE pero no VOLVER. Para verlo
+# volver hace falta un segundo pedido con la misma diferencia de gramaje.
 PEDIDOS = [
     {
         "of": "90001", "isbn": "9780000000017", "carpeta": "90001",
@@ -168,13 +173,6 @@ PEDIDOS = [
         # 30.000 contra 3.000 pedidos, y 250 g contra 240: la misma pareja de
         # discrepancias que el caso real, una grave y una menor.
         "orden": {"cantidad": "30.000", "paginas": "288", "gr_cubierta": "250"},
-    },
-    {
-        "of": "90003", "isbn": "9780000000031", "carpeta": "90003",
-        "titulo": "Cuaderno de Grabados Apocrifos",
-        "cliente": {"cantidad": "800", "paginas": "96", "gr_cubierta": "300"},
-        # El mismo error, otro pedido: 8.000 contra 800.
-        "orden": {"cantidad": "8.000", "paginas": "96", "gr_cubierta": "300"},
     },
 ]
 
@@ -218,10 +216,9 @@ def main():
         "no existen. Lo genera `demo/generar_ejemplo.py`.\n\n"
         "- **90001** — presupuesto, pedido y orden que dicen lo mismo. Se "
         "despacha sin incidencias.\n"
-        "- **90002** — la orden manda fabricar 30.000 ejemplares de los 3.000 "
-        "que pidió el cliente, y sube el gramaje de cubierta de 240 a 250 g.\n"
-        "- **90003** — el mismo error otra vez: 8.000 de los 800 pedidos. Sirve "
-        "para enseñar que el sistema recuerda cómo se resolvió el anterior.\n"
+        "- **90002** — dos diferencias que no se deciden igual: la orden manda "
+        "fabricar 30.000 ejemplares de los 3.000 que pidió el cliente, y sube "
+        "el gramaje de cubierta de 240 a 250 g.\n"
         "- **expediente/** — el contrato marco del cliente, vigente hasta marzo "
         "de 2027, con preaviso de 60 días.\n\n"
         "Existen para que la demo se pueda recorrer entera en cualquier "

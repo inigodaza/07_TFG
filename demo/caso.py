@@ -67,6 +67,26 @@ LECTURAS_DE_CAMPO = {
          "coinciden los dos: Mencía la etiqueta como producción y la matriz de "
          "Pablo da a Dir. Producción «la operativa y las fechas de entrega»"),
     ],
+    # Gramajes. Una sola lectura, y por primera vez sin desacuerdo: el reparto
+    # que envió Mencía el 14 sep da a Producción «todo lo relacionado con
+    # producción» dejando fuera expresamente precios de venta y facturas, y la
+    # matriz de Pablo da a Dir. Producción «los procesos de planta». El papel
+    # con el que se fabrica algo es de planta en las dos lecturas.
+    #
+    # Hacía falta declararlo: sin ámbito, la incongruencia de gramaje se abría
+    # y no la podía cerrar nadie — ni siquiera el director de producción.
+    "gramaje_cubierta": [
+        ("produccion",
+         "coinciden los dos: el reparto de Mencía deja los materiales dentro de "
+         "producción y la matriz de Pablo da a Dir. Producción «los procesos de "
+         "planta»"),
+    ],
+    "gramaje_interior": [
+        ("produccion",
+         "coinciden los dos: el reparto de Mencía deja los materiales dentro de "
+         "producción y la matriz de Pablo da a Dir. Producción «los procesos de "
+         "planta»"),
+    ],
     "precio": [
         ("financiera",
          "es un importe; la matriz da a Dir. Financiera «presupuestos, cuentas e "

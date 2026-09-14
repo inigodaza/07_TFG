@@ -29,7 +29,7 @@ puntos creo que conviene discutir.
 **Recorrido probado de extremo a extremo**: identificarse → recibir dos tandas y ver saltar la alarma → atender la
 alarma del 90002 → proponer con justificación → cambiar a director (que ve la
 justificación previa) → cerrar → ver el registro de criterio → volver a la cola →
-atender el 90003 y **encontrar el precedente puesto**.
+tolerar el gramaje del 90002 y **ver el criterio guardarse**. Para verlo VOLVER hace falta un segundo pedido con la misma diferencia, que hoy no está en la bandeja.
 
 602 comprobaciones automáticas en verde, de las cuales 40 cubren lo que se añadió
 por este guion.

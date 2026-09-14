@@ -2918,14 +2918,15 @@ if _EJEMPLO:
               "documento que se puede situar en el tiempo — y ese criterio lo "
               "pone el módulo de vigencia, que es de quien es la pregunta",
               str(len(_est_ej["contratos"])))
-    comprobar(_est_ej["pedidos"] == 3,
-              "…y los nueve documentos restantes se reparten solos en tres "
+    comprobar(_est_ej["pedidos"] == 2,
+              "…y los seis documentos restantes se reparten solos en dos "
               "pedidos, agrupando por ISBN y no por el nombre del fichero",
               str(_est_ej["pedidos"]))
     comprobar(len(_est_ej["limpios"]) == 1 and len(_est_ej["alarmas"]) == 2,
               "El sistema DISTINGUE: despacha un pedido sin molestar a nadie y "
-              "levanta alarma en los otros dos. Una alarma que saltara en todo "
-              "lo que mira no demostraría nada",
+              "levanta DOS incidencias en el otro. Dos y no una porque ese "
+              "pedido trae dos diferencias que no se deciden igual: la cantidad "
+              "se corrige y el gramaje puede tolerarse",
               f'{len(_est_ej["limpios"])} limpios, {len(_est_ej["alarmas"])} alarmas')
     comprobar(all(a["etiqueta"].startswith("O.F.") for a in _est_ej["alarmas"]),
               "Cada pedido se nombra por su número de orden, sacado de la propia "
@@ -3010,24 +3011,31 @@ if _EJEMPLO:
 
     # La recepción: los documentos entran por tandas, no de golpe.
     _lotes = _CON_S.lotes(_docs_ej)
-    comprobar(set(_lotes) == {"90001", "90002", "90003", "expediente"},
+    comprobar(set(_lotes) == {"90001", "90002", "expediente"},
               "La documentación entra repartida en tandas, como llegaría de "
-              "verdad: tres pedidos y el expediente del cliente",
+              "verdad: dos pedidos y el expediente del cliente",
               str(sorted(_lotes)))
     _solo_uno = _CON_S.arrancar(_lotes["90001"], A.clasificar)
     comprobar(not _solo_uno["alarmas"] and len(_solo_uno["limpios"]) == 1,
               "Recibiendo sólo la primera tanda no salta ninguna alarma: el "
               "sistema no avisa de lo que todavía no ha visto")
     _dos = _CON_S.arrancar(_lotes["90001"] + _lotes["90002"], A.clasificar)
-    comprobar(len(_dos["alarmas"]) == 1,
-              "…y al entrar la segunda salta una, y sólo una. Que la alarma "
-              "aparezca CUANDO entra el documento es lo que hace creíble que el "
-              "sistema la ha encontrado en vez de tenerla escrita")
+    comprobar(len(_dos["alarmas"]) == 2
+              and {a["principal"]["campo"] for a in _dos["alarmas"]}
+                  == {"cantidad", "gramaje_cubierta"},
+              "…y al entrar la segunda tanda saltan las dos diferencias de ese "
+              "pedido, cada una por su lado. Que aparezcan CUANDO entra el "
+              "documento es lo que hace creíble que el sistema las ha "
+              "encontrado en vez de tenerlas escritas",
+              str([a["id"] for a in _dos["alarmas"]]))
+    comprobar(len({a["id"] for a in _dos["alarmas"]}) == 2,
+              "Cada incongruencia tiene identidad propia —pedido más campo—, "
+              "que es lo que permite resolver una y dejar la otra abierta")
     _tres = _CON_S.arrancar([d for ds in _lotes.values() for d in ds],
                             A.clasificar)
     comprobar(len(_tres["alarmas"]) == 2 and len(_tres["contratos"]) == 1,
-              "Con todo dentro: dos alarmas y el contrato apartado del conteo "
-              "de pedidos")
+              "Con todo dentro: dos incongruencias y el contrato apartado del "
+              "conteo de pedidos")
 
     _al = _est_ej["alarmas"][0]
     _ctx_bajo = _CON_S.contexto_operario("Encargados de Turno", _al)
@@ -3123,26 +3131,34 @@ if _EJEMPLO:
               "sistema no se inventa uno")
     _MEM.registrar(_al["principal"], "aceptar", "Dir. Producción",
                    _al["etiqueta"], propuesta_por="Encargados de Turno",
-                   ruta=_ruta_mem)
-    _al2 = _est_ej["alarmas"][1]
-    _sug = _MEM.sugerencia(_al2["principal"], _ruta_mem)
+                   es_criterio=True, ruta=_ruta_mem)
+    # El caso siguiente NO sale de la bandeja de ejemplo.
+    #
+    # Antes salía —había un tercer pedido que repetía el error de cantidad—, y
+    # eso ataba una prueba del núcleo a los documentos de la demostración: al
+    # quitar ese pedido, la memoria «dejaba de funcionar» sin que nada de la
+    # memoria hubiera cambiado. Lo que se comprueba aquí es que dos incidencias
+    # de la misma FORMA se reconocen, y para eso basta con escribir la segunda.
+    _otro_caso = {"campo": "cantidad", "etiqueta": "Cantidad",
+                  "valor_cliente": "800", "valor_orden": "8.000"}
+    _sug = _MEM.sugerencia(_otro_caso, _ruta_mem)
     comprobar(_sug and _sug["casos"] == 1 and _sug["decision"] == "aceptar",
-              "Resuelta una alarma, la SIGUIENTE de la misma clase llega con su "
-              "precedente puesto: 3.000 contra 30.000 y 800 contra 8.000 son el "
-              "mismo problema aunque no sean los mismos números")
-    comprobar(_MEM.clase_de(_al["principal"]) == _MEM.clase_de(_al2["principal"]),
+              "Resuelta una incidencia, la SIGUIENTE de la misma clase llega con "
+              "su precedente puesto: 3.000 contra 30.000 y 800 contra 8.000 son "
+              "el mismo problema aunque no sean los mismos números")
+    comprobar(_MEM.clase_de(_al["principal"]) == _MEM.clase_de(_otro_caso),
               "…porque lo que se recuerda es la FORMA del error —qué campo y en "
               "qué dirección— y no los valores concretos, que no se repiten nunca")
     comprobar(_sug["ofrecer"] is False,
               "Con un solo precedente se enseña pero no se ofrece aplicarlo: una "
               "sola vez es una anécdota")
-    _MEM.registrar(_al2["principal"], "aceptar", "Dir. Producción", "otro",
-                   ruta=_ruta_mem)
+    _MEM.registrar(_otro_caso, "aceptar", "Dir. Producción", "otro",
+                   es_criterio=True, ruta=_ruta_mem)
     comprobar(_MEM.sugerencia(_al["principal"], _ruta_mem)["ofrecer"] is True,
               "Con dos coincidentes sí se ofrece como atajo — y aun así hay que "
               "pulsarlo: quien responde de la decisión sigue siendo la persona")
-    _MEM.registrar(_al2["principal"], "corregir", "Dir. Producción", "otro2",
-                   ruta=_ruta_mem)
+    _MEM.registrar(_otro_caso, "corregir", "Dir. Producción", "otro2",
+                   es_criterio=True, ruta=_ruta_mem)
     _desacuerdo = _MEM.sugerencia(_al["principal"], _ruta_mem)
     comprobar(_desacuerdo["ofrecer"] is False
               and len(_desacuerdo["reparto"]) == 2,
@@ -3386,6 +3402,407 @@ comprobar("hilo-paso--corte" in _marcado,
 comprobar(_marcado.index("hilo-paso--corte")
           > _marcado.index('hilo-paso--ejecutable'),
           "El corte no está al principio: los primeros pasos sí se recorren")
+
+print("\n39 · Entrar con usuario y contraseña: el usuario es el puesto")
+# La puerta no aporta seguridad ninguna y no se comprueba como si la aportara.
+# Lo que sí se comprueba es lo único que importa de ella: que al otro lado el
+# puesto y los permisos salgan de la ontología y no de la pantalla de entrada,
+# y que no haya por medio ningún nombre de persona — porque la autoridad la
+# lleva el puesto, y un nombre junto a un permiso afirma lo que la matriz no
+# dice.
+from demo import identidad as _ID
+
+comprobar(_ID.entrar("ingeniero.jefe", "no-es")[0] is None
+          and _ID.entrar("noexiste", _ID.CLAVE)[0] is None,
+          "Con la contraseña mal no se entra, y con un usuario inventado "
+          "tampoco")
+comprobar(_ID.entrar("noexiste", _ID.CLAVE)[1]
+          == _ID.entrar("ingeniero.jefe", "no-es")[1],
+          "…y el motivo es el mismo en los dos casos: una puerta que distingue "
+          "«ese usuario no existe» de «esa contraseña no es» está diciendo la "
+          "mitad de lo que se le pregunta")
+comprobar(_ID.entrar("ingeniero.jefe", _ID.CLAVE)[0]["rol"] == "Dir. Producción",
+          "Con las buenas se entra, y lo que se obtiene no es «acceso»: es un "
+          "puesto de la matriz de autoridad")
+
+from nucleo import autoridad as _AUT_ID
+_roles_onto = {r["rol"] for r in (_AUT_ID.cargar() or {}).get("roles", [])}
+_sin_fila = [p for p in _ID.usuarios() if p["rol"] not in _roles_onto]
+comprobar([p["usuario"] for p in _sin_fila] == ["mantenimiento.planta"],
+          "Ocho de los nueve usuarios tienen fila en la matriz de Pablo. El que "
+          "no la tiene es Mantenimiento de Planta, que sale en el organigrama y "
+          "no en la matriz",
+          str([p["rol"] for p in _sin_fila]))
+
+_perm_enc = _ID.permisos("Encargados de Turno")
+comprobar([x["accion"] for x in _perm_enc["puede"]] == ["proponer"]
+          and all(x["categoria"] == "produccion" for x in _perm_enc["puede"]),
+          "Lo que puede el encargado no está escrito en ningún sitio: se deduce "
+          "preguntándole a la ontología área por área, y sale lo único que "
+          "puede — proponer, y sólo en producción",
+          str([(x["categoria"], x["accion"]) for x in _perm_enc["puede"]]))
+_perm_dir = _ID.permisos("Dir. Producción")
+comprobar({x["accion"] for x in _perm_dir["puede"]} == {"proponer", "validar"}
+          and len(_perm_dir["no_puede"]) == 4,
+          "El director de producción propone Y valida, pero sólo en lo suyo: "
+          "las otras dos áreas le quedan fuera",
+          f'{len(_perm_dir["puede"])} sí, {len(_perm_dir["no_puede"])} no')
+_perm_ceo = _ID.permisos("CEO / Dirección General")
+comprobar(len(_perm_ceo["no_puede"]) == 0 and len(_perm_ceo["puede"]) == 6,
+          "La autoridad global alcanza a las tres áreas, que es lo que dice su "
+          "fila y no una excepción escrita aparte")
+
+# La distinción que sostiene todo el proyecto, aplicada a una pantalla de
+# permisos: un hueco del organigrama NO es un permiso denegado.
+_perm_luis = _ID.permisos("Mantenimiento de Planta")
+comprobar(len(_perm_luis["no_consta"]) == 6
+          and not _perm_luis["puede"] and not _perm_luis["no_puede"],
+          "Un rol que la matriz no reconoce no sale con todo en rojo: sale "
+          "entero en «no consta». Pintarlo de rojo convertiría un hueco de la "
+          "ontología en una decisión del sistema",
+          f'{len(_perm_luis["no_consta"])} sin resolver')
+
+_ficha_luis = _ID.ficha("mantenimiento.planta")
+comprobar(_ficha_luis["rol_en_la_matriz"] is False
+          and _ficha_luis["cometido"],
+          "…y la ficha lo declara en vez de esconderlo, con lo poco que sí se "
+          "sabe de ese puesto — copiado de su autor, no redactado por mí")
+
+comprobar(not [p for p in _ID.usuarios() if "nombre" in p],
+          "En la plantilla no hay ni un nombre de persona: el usuario ES el "
+          "puesto. La autoridad la lleva el puesto, y poner un nombre al lado "
+          "de un permiso afirmaría algo que la matriz no dice")
+comprobar(all(_rex.fullmatch(r"[a-z]+\.[a-z]+", p["usuario"])
+              for p in _ID.usuarios()),
+          "…y los nueve usuarios se escriben igual: puesto en minúsculas y "
+          "separado por un punto",
+          str([p["usuario"] for p in _ID.usuarios()][:3]))
+
+comprobar(_ID.url_organigrama("ingeniero.jefe").startswith("?vista=organigrama")
+          and _ID.url_organigrama("dir.comercial") is None,
+          "El organigrama se abre por una VISTA de la propia aplicación, no "
+          "como fichero estático. Servido de `static/` funcionaba en local y en "
+          "Streamlit Cloud abría una pestaña en blanco",
+          str(_ID.url_organigrama("ingeniero.jefe")))
+comprobar("enableStaticServing" not in pathlib.Path(".streamlit/config.toml")
+                                              .read_text(encoding="utf-8"),
+          "…y ya no hace falta activar el servicio de estáticos: la vista no "
+          "depende de ninguna opción del servidor, que es justo lo que no se "
+          "puede comprobar desde el portátil antes de una reunión")
+comprobar(pathlib.Path("static/organigrama.html").is_file()
+          and "vista=organigrama" in pathlib.Path("app.py")
+                                            .read_text(encoding="utf-8"),
+          "El HTML está en el repositorio y la aplicación atiende esa vista. Si "
+          "el fichero no llegara, la pestaña lo DICE en vez de salir en blanco")
+
+# El apellido del que firma y la autoridad con la que firma son dos datos, y el
+# registro necesita los dos.
+_ctx_firma = _CON_S.contexto_operario("Encargados de Turno", _inc_ej,
+                                      persona="Carlos Ruiz")
+comprobar(_ctx_firma["quien"] == "Carlos Ruiz (Encargados de Turno)"
+          and _ctx_firma["rol"] == "Encargados de Turno",
+          "La firma y la autoridad son dos datos, y el registro sabe guardar "
+          "los dos. Hoy la demostración no usa nombres, pero el día que la "
+          "empresa los ponga el sitio ya está hecho")
+comprobar(_CON_S.contexto_operario("Encargados de Turno", _inc_ej)["quien"]
+          == "Encargados de Turno",
+          "…y sin persona identificada —que es como corre hoy la consola— el "
+          "registro firma con el puesto y no se inventa un nombre")
+
+_ctx_dir_39 = _CON_S.contexto_operario("Dir. Producción", _inc_ej,
+                                       persona="Jorge Hernández")
+_sin_valor = _CON_S.actuar(_inc_ej, "corregir", _ctx_dir_39, valor="",
+                           justificacion="La orden lleva un cero de más.")
+comprobar(_sin_valor["cerrada"] is False and _sin_valor.get("falta_valor"),
+          "«Corregir» sin decir a qué NO cierra la alarma. Cerrarla dejaría la "
+          "cola limpia y el pedido sin dato, que es peor que no haberla "
+          "atendido",
+          _sin_valor["mensaje"][:60])
+
+print("\n40 · El panel de la incidencia: el color dice QUIÉN, no CÓMO ha salido")
+# En el resto de la aplicación el color afirma un veredicto. En este panel no:
+# distingue herramientas. Que sean tonos distintos de los del veredicto es lo
+# único que evita que el verde de similitud se lea como «este análisis ha salido
+# bien» cuando lo que dice es «todavía no está conectado».
+_paleta_mod = {_rex.search(rf"--mod-{_k}:\s*(#[0-9a-f]{{6}})", _UI.ESTILO.lower()).group(1)
+               for _k in ("auditoria", "diligencia", "similitud")}
+_paleta_ver = {_rex.search(rf"--{_k}:\s*(#[0-9a-f]{{6}})", _UI.ESTILO.lower()).group(1)
+               for _k in ("bien", "mal", "espera")}
+comprobar(len(_paleta_mod) == 3 and not (_paleta_mod & _paleta_ver),
+          "Las tres herramientas tienen tres colores propios, y ninguno es el "
+          "verde, el rojo ni el azul con los que esta aplicación dice si algo "
+          "ha salido bien. Reutilizarlos haría que el color mintiera",
+          f"módulos={sorted(_paleta_mod)} · veredicto={sorted(_paleta_ver)}")
+def _contraste(a, b):
+    def _lum(h):
+        h = h.lstrip("#")
+        c = [int(h[i:i + 2], 16) / 255 for i in (0, 2, 4)]
+        c = [x / 12.92 if x <= .03928 else ((x + .055) / 1.055) ** 2.4
+             for x in c]
+        return .2126 * c[0] + .7152 * c[1] + .0722 * c[2]
+    _a, _b = _lum(a), _lum(b)
+    return (max(_a, _b) + .05) / (min(_a, _b) + .05)
+
+_flojos = [c for c in _paleta_mod if _contraste(c, "#ffffff") < 4.5]
+comprobar(not _flojos,
+          "Los tres colores de módulo pasan 4.5:1 sobre blanco. No basta con "
+          "3:1 de gráfico: además de la banda escriben el rótulo del botón, y "
+          "eso es texto — proyectado, un ámbar flojo desaparece",
+          f"por debajo: {_flojos}")
+comprobar("--mod:" in _UI.ESTILO or "var(--mod," in _UI.ESTILO,
+          "…y el color del módulo entra por una variable de la tarjeta, no "
+          "pintando el fondo: banda e icono. Un fondo verde ya sería un "
+          "veredicto, se quiera o no")
+
+_pasos_q = []
+_orig_md2 = _UI.st.markdown
+_UI.st.markdown = lambda cuerpo, **kw: _pasos_q.append(cuerpo)
+try:
+    for _c in _CON_S.cuadros_del_caso(_inc_ej, _est_ej):
+        _UI.cuadro_herramienta(_c)
+finally:
+    _UI.st.markdown = _orig_md2
+_html_q = "".join(_pasos_q)
+comprobar(_html_q.count('class="cuadro') == 3 and _html_q.count("<svg") == 3,
+          "Las tres tarjetas se pintan y las tres llevan icono dibujado, no de "
+          "una fuente de emojis: proyectado desde un portátil ajeno los emojis "
+          "salen de otro tamaño y de otro color")
+comprobar("no puede contestar" not in _html_q.lower()
+          and "Pendiente de conectar" in _html_q,
+          "Similitud dice «pendiente de conectar» y no «no puede contestar». "
+          "Suena parecido y no es lo mismo: lo segundo insinúa que el módulo de "
+          "Álvaro falla, y lo que pasa es que no está enchufado a este "
+          "expediente")
+comprobar(all(_e in _html_q for _e in ("Le corresponde", "Consultable",
+                                       "Pendiente de conectar")),
+          "El estado de cada herramienta sigue viajando en palabras. Quien no "
+          "distinga los tres colores lee exactamente lo mismo")
+
+print("\n41 · Excepción no es criterio: lo que pasó y lo que se aprendió")
+# La distinción que sostiene la pantalla de cierre. Si se pierde, las dos
+# secciones —Resueltas y Criterios guardados— tienen el mismo contenido y una
+# de las dos sobra; y peor: una excepción se convierte en regla sin que nadie
+# lo haya querido, y la próxima vez el sistema recomienda hacer una excepción.
+_ruta_c = pathlib.Path("/tmp/memoria_criterio_prueba.json")
+_MEM.olvidar(_ruta_c)
+_disc = {"campo": "gramaje_cubierta", "etiqueta": "Gramaje de cubierta",
+         "valor_cliente": 240, "valor_orden": 250}
+_MEM.registrar(_disc, "dar_por_buena", "Dir. Producción", "P-A",
+               justificacion="10 g de más en cubierta, asumible.",
+               es_criterio=False, valor_decidido=250, ruta=_ruta_c)
+comprobar(len(_MEM.historial(_ruta_c)) == 1
+          and _MEM.precedentes(_disc, _ruta_c) == [],
+          "Una excepción CONSTA en el historial y NO vuelve como precedente. "
+          "Son las dos mitades del cierre: lo que pasó y lo que se aprendió",
+          f'historial={len(_MEM.historial(_ruta_c))} '
+          f'precedentes={len(_MEM.precedentes(_disc, _ruta_c))}')
+_MEM.registrar(_disc, "dar_por_buena", "Dir. Producción", "P-B",
+               justificacion="Mismo caso, y esta vez sí sienta criterio.",
+               es_criterio=True, valor_decidido=250, ruta=_ruta_c)
+comprobar(len(_MEM.precedentes(_disc, _ruta_c)) == 1
+          and _MEM.resumen(_ruta_c)["excepciones"] == 1
+          and _MEM.resumen(_ruta_c)["criterios"] == 1,
+          "…y marcada como criterio sí vuelve. El sistema cuenta las dos por "
+          "separado porque son dos cosas distintas")
+comprobar(_MEM.cargar(_ruta_c)[1]["version"] == 1,
+          "La versión cuenta criterios, no cierres: dos excepciones seguidas no "
+          "son «la versión 3 del criterio», son dos veces que no hubo criterio",
+          str([r["version"] for r in _MEM.cargar(_ruta_c)]))
+_MEM.olvidar(_ruta_c)
+
+# La cuarta acción: dar por buena la orden.
+comprobar(_CON_S.ACCIONES["dar_por_buena"][0] == "Marcar como tolerable"
+          and _CON_S.ACEPTACIONES == ("aceptar", "dar_por_buena"),
+          "La cuarta acción se llama como la llama Juan —«tolerable»— y no como "
+          "se me ocurrió a mí. Su módulo ya tiene el concepto; inventar "
+          "vocabulario nuevo para algo que en GraphyCems ya tiene nombre es "
+          "exactamente lo que este bloque no debe hacer",
+          _CON_S.ACCIONES["dar_por_buena"][0])
+_gram = next(a for a in _est_ej["alarmas"]
+             if a["principal"]["campo"] == "gramaje_cubierta")
+_ctx_g = _CON_S.contexto_operario("Dir. Producción", _gram)
+comprobar(_ctx_g["puede_validar"] is True,
+          "La incongruencia de gramaje tiene ámbito y por tanto alguien que "
+          "pueda cerrarla. Sin declararlo se abría una alarma que no podía "
+          "resolver nadie, ni siquiera el director de producción",
+          f'categoría={_ctx_g["categoria"]} · {_ctx_g["motivo"]}')
+_MEM.olvidar()
+_r_dpb = _CON_S.actuar(
+    _gram, "dar_por_buena", _ctx_g,
+    justificacion="10 g de más en cubierta, asumible.", es_criterio=True)
+comprobar(_r_dpb["cerrada"] and str(_r_dpb["valor"]) == "250",
+          "«Dar por buena la orden» cierra con el valor de la ORDEN, no con el "
+          "del cliente. Es lo que distingue aceptar una diferencia de "
+          "corregirla",
+          str(_r_dpb["valor"]))
+comprobar(_r_dpb["es_criterio"] is True
+          and _r_dpb["registro"]["es_criterio"] is True,
+          "…y si quien cierra lo marca, queda como criterio")
+comprobar("tolerable" in _r_dpb["mensaje"].lower()
+          and "otro pedido" in _r_dpb["mensaje"],
+          "…y el mensaje dice lo que dijo Juan por WhatsApp el 14 sep: «si "
+          "vuelve a salir ese mismo aviso en otro pedido sale como que es un "
+          "fallo tolerable»",
+          _r_dpb["mensaje"][-130:])
+_r_corr = _CON_S.actuar(_gram, "corregir", _ctx_g, valor="245",
+                        justificacion="Ni uno ni otro.", es_criterio=True)
+comprobar(_r_corr["es_criterio"] is False,
+          "Una CORRECCIÓN no puede dejar criterio aunque se marque: corregir a "
+          "un tercer valor resuelve este caso y no dice nada de los "
+          "siguientes. Sólo se generaliza lo que se acepta")
+_MEM.olvidar()
+
+# Una incongruencia, una alarma.
+comprobar(len({a["id"] for a in _est_ej["alarmas"]}) == 2
+          and sum(1 for a in _est_ej["alarmas"]
+                  if a["etiqueta"] == "O.F. 90002") == 2,
+          "El pedido con dos diferencias produce DOS alarmas, no una con la "
+          "otra de paquete. Si viajaran juntas habría que decidirlas igual, y "
+          "un cero de más y diez gramos de más no se deciden igual",
+          str([a["id"] for a in _est_ej["alarmas"]]))
+comprobar(all(len(a["discrepancias"]) == 1 for a in _est_ej["alarmas"]),
+          "…y cada alarma lleva su única discrepancia, así que el panel deja de "
+          "hablar de «otras diferencias» que nadie podía atender por separado")
+
+# Los ámbitos que envió Mencía.
+comprobar(_AUT_ID.area_de("fecha_entrega") == "Área de Producción"
+          and _AUT_ID.area_de("factura") == "Área Financiera"
+          and _AUT_ID.area_de("precio_venta") == "Área Comercial",
+          "El reparto de ámbitos de Mencía está cargado: fechas a Producción, "
+          "facturas a Finanzas, precios de venta a Comercial")
+comprobar(_AUT_ID.area_de("rrhh") is None,
+          "…y lo que ella deja fuera de su área sin decir de quién es NO se le "
+          "asigna a nadie. «No consta» no es «de nadie»")
+comprobar(_AUT_ID.categorias_confirmadas() is False,
+          "Y la bandera sigue en False: su reparto no se pronuncia sobre "
+          "«cantidad», que es el campo del desacuerdo, y ponerla a True no "
+          "cambia la consola — lo único que hace es empezar a puntuarle un "
+          "fallo al módulo de Mencía con un mapa que Pablo no ha firmado")
+
+# Lo que ve el encargado de turno, que es quien abre la demostración.
+#
+# Mencía lo escribe con estas palabras, y son información directa de
+# GraphyCems: «Encargados de turno: acceso a todo lo relacionado con
+# producción». Acceso, no mando — y la aplicación distingue las dos cosas.
+_ctx_enc = [_CON_S.contexto_operario("Encargados de Turno", a)
+            for a in _est_ej["alarmas"]]
+comprobar(all(c["categoria"] == "produccion" and c["puede_proponer"] is True
+              for c in _ctx_enc),
+          "El encargado de turno VE las tres incongruencias del lote: las tres "
+          "son de producción y él está en producción, que es justo lo que dice "
+          "el reparto que envió Mencía",
+          str([(c["categoria"], c["puede_proponer"]) for c in _ctx_enc]))
+comprobar(all(c["puede_validar"] is False for c in _ctx_enc),
+          "…y no cierra ninguna. «Acceso a todo lo relacionado con producción» "
+          "no es «manda sobre producción»: lo primero lo dice el reparto de "
+          "Mencía y lo segundo la matriz de Pablo, y la aplicación no las "
+          "confunde")
+comprobar(all("escalar" in _CON_S.acciones_para(c) for c in _ctx_enc),
+          "Por eso le sale «escalar», que es la acción que a su jefe no le "
+          "aparece: los botones los pone el puesto, no el guion")
+comprobar(_CON_S.etiqueta_accion("corregir", _ctx_enc[0])
+          == "Proponer: corregir con otro valor"
+          and _CON_S.etiqueta_accion("corregir", _ctx_g) == "Corregir con otro valor",
+          "Y al encargado el botón le dice «Proponer: corregir», no «Corregir». "
+          "Mencía lo puso en palabras el 14 sep —«el encargado no puede "
+          "corregir, sólo proponérselo al superior»— y por dentro el sistema ya "
+          "lo hacía; lo que mentía era el rótulo",
+          _CON_S.etiqueta_accion("corregir", _ctx_enc[0]))
+comprobar(_CON_S.etiqueta_accion("escalar", _ctx_enc[0])
+          == _CON_S.ACCIONES["escalar"][0],
+          "…y «escalar» no se prefija: escalar ya ES la acción de quien no "
+          "puede cerrar, y «Proponer: escalar» no querría decir nada")
+
+# El vocabulario de gravedad, que es el del módulo de Juan.
+_p_cant = next(a["principal"] for a in _est_ej["alarmas"]
+               if a["principal"]["campo"] == "cantidad")
+_p_gram = _gram["principal"]
+comprobar(_CON_S.etiqueta_severidad(_p_cant) == "INCONGRUENCIA"
+          and _CON_S.etiqueta_severidad(_p_gram) == "A REVISAR",
+          "La cola rotula las dos gravedades como las rotula el módulo de Juan: "
+          "la cantidad es INCONGRUENCIA y el gramaje va A REVISAR. Es su salida "
+          "sobre el pedido 42805, que es este mismo caso",
+          f'{_CON_S.etiqueta_severidad(_p_cant)} / {_CON_S.etiqueta_severidad(_p_gram)}')
+comprobar("redondeo estándar" in (_CON_S.nota_de_revision(_p_gram) or "")
+          and _CON_S.nota_de_revision(_p_cant) is None,
+          "…y la hipótesis del redondeo estándar la pone él, no yo: sale sólo "
+          "donde él la puso —el gramaje— y no en la cantidad, que en su módulo "
+          "es incongruencia sin matices")
+comprobar("no el sistema" in (_CON_S.nota_de_revision(_p_gram) or ""),
+          "La nota dice además quién decide: si es tolerable lo dice "
+          "producción. El sistema saca la diferencia; no la indulta")
+comprobar(".alarma--revisar" in _UI.ESTILO
+          and "--espera" in _UI.ESTILO.split(".alarma--revisar")[1][:200],
+          "…y en la cola «a revisar» sale en el azul de espera, no en el rojo de "
+          "incongruencia. Pintarlas igual diría que son lo mismo, y el recorrido "
+          "entero consiste en que no lo son")
+
+# El impacto sólo vale donde se cuentan ejemplares.
+comprobar(_FLU.impacto(_p_gram) is None and _FLU.impacto(_p_cant) is not None,
+          "«27.000 unidades de más, 10 veces lo pedido» sólo se dice de una "
+          "cantidad. Un gramaje de 250 donde se pidieron 240 NO son «10 "
+          "unidades de más»: la resta no significa nada parecido, y una frase "
+          "que no quiere decir nada es peor que ninguna porque parece un dato",
+          str(_FLU.impacto(_p_gram)))
+
+comprobar("dar_por_buena" not in str(_UI.VERBO_DECISION.values())
+          and _UI.VERBO_DECISION["dar_por_buena"] == "da por buena la orden",
+          "Las claves internas no se enseñan nunca. En una lista de decisiones "
+          "humanas, un «dar_por_buena» con guiones bajos delata que lo que se "
+          "enseña es una fila de base de datos y no lo que hizo una persona")
+
+_pasos_h = []
+_orig_h = _UI.st.markdown
+_UI.st.markdown = lambda cuerpo, **kw: _pasos_h.append(cuerpo)
+try:
+    _UI.registro_actividad([
+        {"pedido": "O.F. 90002", "etiqueta": "Cantidad", "campo": "cantidad",
+         "valor_cliente": "3000", "valor_orden": "30000",
+         "valor_decidido": "3000", "decision": "aceptar",
+         "validada_por": "Dir. Producción", "propuesta_por": "Encargados de Turno",
+         "cuando": "2026-09-14T10:00:00+00:00", "es_criterio": False,
+         "justificacion": "La orden lleva un cero de más."},
+        {"pedido": "O.F. 90002", "etiqueta": "Gramaje de cubierta",
+         "campo": "gramaje_cubierta", "valor_cliente": "240",
+         "valor_orden": "250", "valor_decidido": "250",
+         "decision": "dar_por_buena", "validada_por": "Dir. Producción",
+         "cuando": "2026-09-14T10:05:00+00:00", "es_criterio": True,
+         "justificacion": "10 g de más es asumible."},
+    ])
+finally:
+    _UI.st.markdown = _orig_h
+_h = "".join(_pasos_h)
+comprobar(_h.count("EXCEPCIÓN") == 1 and _h.count("CRITERIO") == 1,
+          "El historial marca cada fila con la PALABRA, no sólo con el color: "
+          "distinguir un criterio de una excepción es lo único que esta "
+          "pantalla tiene que dejar claro")
+comprobar("Cierra Dir. Producción" in _h
+          and "antes lo propuso Encargados de Turno" in _h
+          and "14/09/2026" in _h,
+          "…y cada fila lleva quién actuó, quién lo había propuesto antes y la "
+          "fecha con la hora, que es lo que Fabián pide en «quién decide, con "
+          "qué rol y sobre qué evidencia»")
+
+_pasos_p = []
+_UI.st.markdown = lambda cuerpo, **kw: _pasos_p.append(cuerpo)
+try:
+    _UI.registro_actividad([
+        {"pedido": "O.F. 90002", "etiqueta": "Cantidad", "campo": "cantidad",
+         "valor_cliente": "3000", "valor_orden": "30000",
+         "valor_decidido": "3000", "decision": "corregir", "fase": "propuesta",
+         "propuesta_por": "Encargados de Turno", "validada_por": None,
+         "cuando": "2026-09-14T09:12:00+00:00", "es_criterio": False,
+         "justificacion": "La orden lleva un cero de más."},
+    ])
+finally:
+    _UI.st.markdown = _orig_h
+_hp = "".join(_pasos_p)
+comprobar("PROPUESTA" in _hp and "Propone Encargados de Turno" in _hp
+          and "09:12" in _hp,
+          "Una PROPUESTA consta en el registro con su autor, su hora y su "
+          "motivo. Un encargado que mira una incidencia, dice qué haría y no "
+          "puede cerrarla ha hecho un trabajo: si no consta, a los seis meses "
+          "parece que no lo hizo nadie")
 
 # ---------------------------------------------------------------------------
 print("\n" + ("Todo correcto." if not fallos
