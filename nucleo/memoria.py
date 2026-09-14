@@ -80,12 +80,42 @@ def cargar(ruta=None):
 
 def registrar(discrepancia, decision, quien, pedido, propuesta_por=None,
               justificacion=None, evidencias=None, contexto=None,
-              autorizados=None, diagnostico=None, ruta=None):
+              autorizados=None, diagnostico=None, es_criterio=False,
+              valor_decidido=None, fase="cerrada", ruta=None):
     """
-    Anota una decisión como **registro de criterio**. Devuelve lo guardado.
+    Anota una decisión resuelta. Devuelve lo guardado.
 
-    `decision` es una de las tres acciones del operario: «aceptar» el valor del
-    cliente, «corregir» poniendo otro, o «escalar» cuando no le corresponde.
+    `decision` es la acción del operario: «aceptar» el valor del cliente,
+    «dar_por_buena» la orden, «corregir» poniendo otro valor, o «escalar».
+
+    `fase` distingue una PROPUESTA de un CIERRE
+    -------------------------------------------
+    Las dos son acciones y las dos dejan rastro. Antes sólo se anotaba el
+    cierre, y eso dejaba fuera del registro justo lo que más cuesta reconstruir
+    a los seis meses: que alguien miró la incidencia, dijo qué haría y por qué,
+    y no pudo cerrarla. Una propuesta que no se anota es trabajo que no consta.
+
+    Una propuesta nunca es criterio: no ha cerrado nada. Por eso no entra en
+    `precedentes()` aunque se marcara.
+
+    `es_criterio` separa dos cosas que antes iban juntas
+    ----------------------------------------------------
+    **Todo lo que se cierra se anota.** Eso es el historial: qué pasó, quién lo
+    resolvió y cuándo, y sirve para poder mirar atrás.
+
+    **Sólo lo que alguien marca como criterio vuelve.** Eso es la memoria: lo
+    que el sistema ofrecerá la próxima vez que aparezca una incidencia de la
+    misma clase.
+
+    Antes se guardaba todo como criterio, y eso convertía cada decisión de un
+    martes cualquiera en una regla para el futuro sin que nadie lo hubiera
+    querido. Una excepción —«esta vez lo dejamos pasar»— es justamente lo
+    contrario de un criterio, y el sistema no puede confundirlas: si las
+    confunde, la segunda vez recomienda hacer una excepción, que es un
+    contrasentido.
+
+    Quien decide cuál de las dos cosas es no es el sistema: es la persona que
+    cierra, y se le pregunta.
 
     Lo que se guarda son las dos columnas del guion de Fabián, y las dos hacen
     falta por razones distintas:
@@ -106,7 +136,13 @@ def registrar(discrepancia, decision, quien, pedido, propuesta_por=None,
     ruta = Path(ruta or RUTA)
     registros = cargar(ruta)
     clase = clase_de(discrepancia)
-    version = sum(1 for r in registros if r.get("clase") == clase) + 1
+    # La versión cuenta CRITERIOS de esta clase, no decisiones. Dos excepciones
+    # seguidas no son «la versión 3 del criterio»: son dos veces que no hubo
+    # criterio ninguno.
+    version = sum(1 for r in registros
+                  if r.get("clase") == clase and r.get("es_criterio")) + 1
+    if fase != "cerrada":
+        version = None          # una propuesta no versiona ningún criterio
     registro = {
         # --- Registro trazable
         "clase": clase,
@@ -122,7 +158,13 @@ def registrar(discrepancia, decision, quien, pedido, propuesta_por=None,
         "validada_por": quien,
         "propuesta_por": propuesta_por,
         "cuando": _ahora(),
+        "fase": fase,
         "version": version,
+        "valor_decidido": (None if valor_decidido is None
+                           else str(valor_decidido)),
+        # ¿Esto vuelve la próxima vez, o se queda como lo que pasó aquel día?
+        # Una propuesta no vuelve nunca: todavía no ha decidido nada.
+        "es_criterio": bool(es_criterio) and fase == "cerrada",
         # --- Contexto de reutilización
         "contexto": dict(contexto or {}),
         "autorizados": list(autorizados or []),
@@ -141,10 +183,27 @@ def precedentes(discrepancia, ruta=None, excepto=None):
     `excepto` saca de la lista el pedido que se está mirando. Sin eso, en cuanto
     se cierra una alarma su propio registro vuelve como «precedente» de sí misma
     — que es cierto y es inútil: un caso no se sienta precedente a sí mismo.
+
+    Sólo cuentan los registros marcados como criterio. Una decisión cerrada como
+    excepción está en el historial y **no** aquí: para eso se marcó como
+    excepción.
     """
     clase = clase_de(discrepancia)
     return [r for r in cargar(ruta)
-            if r.get("clase") == clase and r.get("pedido") != excepto]
+            if r.get("clase") == clase and r.get("es_criterio")
+            and r.get("pedido") != excepto]
+
+
+def historial(ruta=None):
+    """
+    Todo lo que se ha cerrado, lo más reciente primero.
+
+    Es la otra mitad de `precedentes()`: aquí está **lo que pasó** —excepciones
+    incluidas— y allí está **lo que se aprendió**. Son dos preguntas distintas y
+    por eso son dos listas distintas; si fueran la misma, una de las dos
+    pantallas del cierre sobraría.
+    """
+    return list(reversed(cargar(ruta)))
 
 
 def sugerencia(discrepancia, ruta=None, contexto=None, excepto=None):
@@ -216,13 +275,21 @@ def aplica_a(registro, contexto):
 def resumen(ruta=None):
     """Para el panel de memoria: cuánto sabe el sistema y de qué."""
     registros = cargar(ruta)
+    cerradas = [r for r in registros if r.get("fase", "cerrada") == "cerrada"]
+    propuestas = [r for r in registros if r.get("fase") == "propuesta"]
+    criterios = [r for r in registros if r.get("es_criterio")]
     clases = {}
-    for r in registros:
+    for r in criterios:
         clases.setdefault(r["clase"], []).append(r)
     return {
-        "decisiones": len(registros),
+        "acciones": len(registros),
+        "decisiones": len(cerradas),
+        "propuestas": len(propuestas),
+        "criterios": len(criterios),
+        "excepciones": len(cerradas) - len(criterios),
         "clases": len(clases),
         "ultimas": list(reversed(registros[-5:])),
+        "ultimos_criterios": list(reversed(criterios[-5:])),
         "por_clase": {k: len(v) for k, v in clases.items()},
     }
 

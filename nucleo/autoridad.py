@@ -53,7 +53,47 @@ AREA_DE_CATEGORIA = {
     "comercial": "Área Comercial",
     "financiera": "Área Financiera",
     "financiero": "Área Financiera",
+    # --- Ampliación del 14 sep 2026, según el reparto que envió Mencía -------
+    #
+    # Ella escribió qué alcanza cada puesto, y de ahí salen estas materias sin
+    # tener que suponerlas:
+    #
+    #   «D. Producción: acceso a todo lo relacionado con producción, fechas,
+    #    etc… podríamos dejar fuera temas de precios de venta, facturas»
+    #   «D. Comercial: todo menos temas de personal, RRHH»
+    #   «D. Financiero: todo menos temas de producción»
+    #   «Admin. Financiero: facturas y contabilidad»
+    #
+    # Dos cosas que conviene no perder de vista al leer esto. La primera es que
+    # su reparto habla de **acceso** —qué alcanza cada puesto— y esta tabla se
+    # usa para decidir **autoridad** —quién puede cerrar—. No son la misma
+    # pregunta, y por eso lo que se traslada aquí es sólo la materia: de qué
+    # área es cada asunto. Quién manda sobre cada área lo sigue diciendo la
+    # matriz de Pablo y sólo ella.
+    #
+    # La segunda es que esto no cierra el desacuerdo de fondo (ver más abajo):
+    # sobre `cantidad` ella sigue sin pronunciarse, y es justo el campo del que
+    # depende la demostración.
+    "fecha_entrega": "Área de Producción",
+    "fechas": "Área de Producción",
+    "planta": "Área de Producción",
+    "gramaje": "Área de Producción",
+    "material": "Área de Producción",
+    "precio_venta": "Área Comercial",
+    "oferta": "Área Comercial",
+    "cliente": "Área Comercial",
+    "factura": "Área Financiera",
+    "facturacion": "Área Financiera",
+    "contabilidad": "Área Financiera",
+    "presupuesto": "Área Financiera",
+    # Ella lo deja fuera de Comercial y no dice de quién es. Sin fila que lo
+    # reclame, no se le asigna área: «no consta» no es «de nadie».
+    # "rrhh": ...
 }
+
+# De dónde sale cada mitad del cruce, para poder decirlo en pantalla.
+FUENTE_AREAS = ("Reparto de ámbitos enviado por Mencía el 14 sep 2026 sobre la "
+                "matriz de autoridad de Pablo")
 
 # ¿La ha escrito alguna de las dos partes, o la he deducido yo?
 #
@@ -69,6 +109,21 @@ AREA_DE_CATEGORIA = {
 # módulos que evalúa.
 #
 # Se pone a True cuando Pablo entregue el mapa campo/categoría → ámbito.
+#
+# Actualización del 14 sep 2026. Mencía ha enviado su reparto de ámbitos y las
+# materias que declara están arriba, usadas. Pero la bandera sigue en False, y
+# no por inercia:
+#
+#   · Su reparto **no se pronuncia sobre `cantidad`**, que es exactamente el
+#     campo del que depende el desacuerdo y del que depende la demostración.
+#     Sigue escribiendo que los Admin. Comerciales alcanzan «clientes y
+#     producción», que es su posición de siempre.
+#   · Esta bandera no gobierna la consola —los permisos de la demo salen igual
+#     con ella puesta o quitada—. Lo único que gobierna es si un cruce de
+#     autoridad **le puntúa como fallo al módulo de Mencía**. Ponerla a True es
+#     armar un suspenso contra su trabajo usando un mapa que Pablo aún no ha
+#     firmado, y eso es precisamente lo que este bloque le reprocha a los
+#     módulos que evalúa.
 CATEGORIAS_CONFIRMADAS = False
 
 

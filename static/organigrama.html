@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Perfil Jorge Hernández - GraphyCems</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap');
+
+        :root {
+            --maio-navy: #003388;
+            --maio-sand: #D7CBBB;
+            --maio-sand-light: #F8F6F0;
+            --bg: #F8FAFC;
+            --surface: #FFFFFF;
+            --text-main: #0F172A;
+            --text-muted: #64748B;
+            --border: #E2E8F0;
+            
+            --level-1: #003388;
+            --level-2: #1E40AF;
+            --level-3: #475569;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg);
+            color: var(--text-main);
+            padding: 15px 20px; /* Reducido de 40px a 15px para ganar espacio */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .header {
+            text-align: center;
+            max-width: 850px;
+            margin-bottom: 20px; /* Reducido de 35px */
+        }
+
+        .brand-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--maio-sand-light);
+            color: var(--maio-navy);
+            border: 1px solid var(--maio-sand);
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+            font-size: 13px;
+            letter-spacing: 0.5px;
+            margin-bottom: 14px;
+            text-transform: uppercase;
+        }
+
+        .header h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 26px; /* Reducido de 34px */
+            font-weight: 800;
+            color: var(--maio-navy);
+            margin-bottom: 6px;
+            letter-spacing: -0.5px;
+        }
+
+        .header p {
+            font-size: 13.5px; /* Reducido de 15px */
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+
+        .main-container {
+            width: 100%;
+            max-width: 1350px; /* Aumentado de 1100px para que sea más ancho */
+            display: flex;
+            flex-direction: column;
+            gap: 15px; /* Reducido de 30px */
+        }
+
+        /* Nivel Superior: CEO e IT */
+        .top-level-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 15px; /* Reducido de 20px */
+        }
+
+        @media(max-width: 768px) {
+            .top-level-grid { grid-template-columns: 1fr; }
+        }
+
+        /* Bloque de Departamento */
+        .dept-columns {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px; /* Reducido de 24px */
+        }
+
+        @media(max-width: 900px) {
+            .dept-columns { grid-template-columns: 1fr; }
+        }
+
+        .dept-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 16px; /* Reducido de 24px */
+            display: flex;
+            flex-direction: column;
+            gap: 12px; /* Reducido de 16px */
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.02);
+            position: relative;
+        }
+
+        .dept-title-badge {
+            font-family: 'Outfit', sans-serif;
+            font-size: 14px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--maio-navy);
+            background: var(--maio-sand-light);
+            border: 1px solid var(--maio-sand);
+            padding: 8px 14px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        /* Tarjeta de Rol */
+        .role-node {
+            background: #FFFFFF;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 14px; /* Reducido de 18px */
+            display: flex;
+            flex-direction: column;
+            gap: 8px; /* Reducido de 10px */
+            transition: all 0.2s ease;
+        }
+
+        .role-node:not(.flip-card-front):not(.flip-card-back):hover {
+            border-color: var(--maio-navy);
+            box-shadow: 0 6px 16px rgba(0, 51, 136, 0.06);
+        }
+
+        .role-node.boss {
+            border-left: 4px solid var(--level-2);
+            background: #F8FAFC;
+        }
+
+        .role-node.subordinate {
+            border-left: 4px solid var(--level-3);
+            background: #FFFFFF;
+        }
+
+        .role-node.ceo-node {
+            border-left: 5px solid var(--level-1);
+            background: linear-gradient(135deg, #F8FAFC 0%, #FFFFFF 100%);
+        }
+
+        .role-node.it-node {
+            border-left: 5px solid #6366F1;
+        }
+
+        .role-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .role-name {
+            font-family: 'Outfit', sans-serif;
+            font-size: 14.5px; /* Reducido de 16.5px */
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .level-tag {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 6px;
+            background: #E2E8F0;
+            color: #334155;
+        }
+
+        .authority-box {
+            background: #EFF6FF;
+            border: 1px solid #BFDBFE;
+            border-radius: 8px;
+            padding: 8px 10px; /* Reducido de 10px 12px */
+            font-size: 11.5px; /* Reducido de 13px */
+            color: #1E40AF;
+            line-height: 1.35;
+        }
+
+        .authority-box strong {
+            color: var(--maio-navy);
+            font-family: 'Outfit', sans-serif;
+            display: block;
+            margin-bottom: 2px;
+            font-size: 12px; /* Reducido de 13.5px */
+        }
+
+        /* Conector de Jerarquía (Flecha de Mando) */
+        .command-connector {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 0; /* Reducido de 4px 0 */
+            color: var(--maio-navy);
+        }
+
+        .command-label {
+            font-family: 'Outfit', sans-serif;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--maio-navy);
+            background: #EFF6FF;
+            padding: 3px 12px;
+            border-radius: 10px;
+            border: 1px solid #BFDBFE;
+            margin-bottom: 2px;
+        }
+
+        .arrow-down {
+            font-size: 18px;
+            font-weight: bold;
+            line-height: 1;
+        }
+
+        .ceo-connector {
+            text-align: center;
+            font-family: 'Outfit', sans-serif;
+            font-size: 11px; /* Reducido de 12.5px */
+            font-weight: 700;
+            color: var(--maio-navy);
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            padding: 8px; /* Reducido de 12px */
+            background: var(--surface);
+            border: 1px dashed var(--maio-sand);
+            border-radius: 12px;
+        }
+
+        /* =========================================
+           ESTILOS PARA LA TARJETA GIRATORIA (FLIP CARD)
+           ========================================= */
+        .flip-card {
+            perspective: 1000px;
+            cursor: pointer;
+            /* Iluminación especial para destacar a esta persona */
+            box-shadow: 0 0 0 4px var(--maio-sand), 0 0 25px rgba(0, 51, 136, 0.5);
+            border-radius: 12px;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            position: relative;
+            z-index: 10;
+        }
+
+        .flip-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 0 0 4px var(--maio-navy), 0 0 30px rgba(0, 51, 136, 0.6);
+        }
+
+        .flip-card-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            transition: transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1);
+            transform-style: preserve-3d;
+        }
+
+        .flip-card.flipped .flip-card-inner {
+            transform: rotateY(180deg);
+        }
+
+        .flip-card-front, .flip-card-back {
+            width: 100%;
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+            border-radius: 12px;
+        }
+
+        /* Frontal de la tarjeta (vista normal) */
+        .flip-card-front {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            background: #F8FAFC;
+            border: 1px solid var(--level-2);
+            border-left: 4px solid var(--level-2);
+            /* Hacemos que ocupe todo el espacio y distribuya su contenido */
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        /* Trasera de la tarjeta (perfil personal) */
+        .flip-card-back {
+            /* Al quitar absolute, esta cara dicta la altura del contenedor */
+            transform: rotateY(180deg);
+            background: var(--maio-navy);
+            color: white;
+            border: none;
+            /* Estilos de role-node pero con colores invertidos */
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 18px;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.2);
+        }
+
+        .flip-card-back .role-name {
+            color: white;
+        }
+
+        .flip-card-back .level-tag {
+            background: rgba(255,255,255,0.2);
+            color: white;
+        }
+
+        .flip-card-back .authority-box {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: #F8F6F0;
+            flex-grow: 1; /* Para que ocupe todo el alto disponible */
+        }
+
+        .flip-card-back .authority-box strong {
+            color: var(--maio-sand);
+        }
+
+        .click-hint {
+            text-align: center;
+            font-size: 11.5px;
+            color: var(--maio-navy);
+            font-weight: 700;
+            margin-top: 12px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.6; }
+            50% { opacity: 1; }
+            100% { opacity: 0.6; }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="brand-tag">Vista de Perfil Individual</div>
+        <h1>Jorge Hernández</h1>
+        <p>Posición dentro de la Estructura de Autoridad y Mando de GraphyCems.</p>
+    </div>
+
+    <div class="main-container">
+
+        <!-- ALTA DIRECCIÓN Y IT -->
+        <div class="top-level-grid" style="opacity: 0.5;">
+            <!-- CEO -->
+            <div class="role-node ceo-node">
+                <div class="role-header">
+                    <div class="role-name">CEO / Dirección General</div>
+                    <div class="level-tag">* Nivel 1</div>
+                </div>
+                <div class="authority-box">
+                    <strong>👑 Autoridad Global:</strong>
+                    Manda sobre la totalidad de las decisiones estratégicas de Producción, Comercial y Financiera respecto al resto de directores.
+                </div>
+            </div>
+
+            <!-- IT -->
+            <div class="role-node it-node">
+                <div class="role-header">
+                    <div class="role-name">IT / Tecnología</div>
+                    <div class="level-tag">* Nivel 1</div>
+                </div>
+                <div class="authority-box">
+                    <strong>⚙️ Autoridad Técnica:</strong>
+                    Manda de forma exclusiva sobre la infraestructura tecnológica, los servidores y el sistema.
+                </div>
+            </div>
+        </div>
+
+        <!-- Conexión CEO -> Departamentos -->
+        <div class="ceo-connector" style="opacity: 0.5;">
+            ⬇ El CEO Ostenta el Mando Máximo sobre las 3 Direcciones Departamentales ⬇
+        </div>
+
+        <!-- DEPARTAMENTOS (COLUMNAS DE MANDO) -->
+        <div class="dept-columns">
+
+            <!-- DEPARTAMENTO DE PRODUCCIÓN (DESTACADO) -->
+            <div class="dept-card" style="border: 2px solid var(--maio-navy); box-shadow: 0 4px 20px rgba(0,51,136,0.1);">
+                <div class="dept-title-badge" style="background: var(--maio-navy); color: white; border-color: var(--maio-navy);">Área de Producción</div>
+
+                <!-- MANDO (Dirección) - TARJETA GIRATORIA -->
+                <div class="flip-card" onclick="this.classList.toggle('flipped')">
+                    <div class="flip-card-inner">
+                        
+                        <!-- FRENTE: Puesto Estándar -->
+                        <div class="flip-card-front role-node boss">
+                            <div class="role-header">
+                                <div class="role-name">Dir. Producción</div>
+                                <div class="level-tag">** Nivel 2</div>
+                            </div>
+                            <div class="authority-box">
+                                <strong>👑 Manda en Producción:</strong>
+                                Tiene la máxima autoridad sobre los procesos de planta, operativa y fechas de entrega.
+                            </div>
+                            <div class="click-hint">
+                                👆 Haz clic para ver perfil
+                            </div>
+                        </div>
+
+                        <!-- REVERSO: Perfil Personal y Mini-Esquema -->
+                        <div class="flip-card-back role-node">
+                            <div class="role-header" style="display: flex; align-items: center; justify-content: space-between;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <div class="role-name">Jorge Hernández</div>
+                                    <div style="font-size: 10px; font-weight: 500; color: var(--maio-navy); background: var(--maio-sand); padding: 2px 6px; border-radius: 4px; line-height: 1;">Ingeniero Jefe</div>
+                                </div>
+                                <div class="level-tag" style="padding: 2px 6px;">Titular</div>
+                            </div>
+                            <div class="authority-box">
+                                <strong>👥 Estructura del Equipo (Subordinados):</strong>
+                                <div style="margin-top: 10px; font-size: 12.5px; line-height: 1.5;">
+                                    <div style="margin-bottom: 8px;">
+                                        <span style="color: var(--maio-sand); font-weight: 600; font-size: 11px; text-transform: uppercase;">▶ Mandos Intermedios (Operativa)</span>
+                                        <ul style="margin-left: 18px; margin-top: 4px; list-style-type: disc;">
+                                            <li style="margin-bottom: 4px;"><strong>Carlos Ruiz</strong> <span style="opacity: 0.8; font-size: 11px;">(Encargado Mañana)</span></li>
+                                            <li><strong>Ana López</strong> <span style="opacity: 0.8; font-size: 11px;">(Encargada Tarde)</span></li>
+                                        </ul>
+                                    </div>
+                                    <div>
+                                        <span style="color: var(--maio-sand); font-weight: 600; font-size: 11px; text-transform: uppercase;">▶ Soporte y Mantenimiento</span>
+                                        <ul style="margin-left: 18px; margin-top: 4px; list-style-type: none;">
+                                            <li>
+                                                └─ <strong>Luis Gómez</strong> <span style="opacity: 0.8; font-size: 11px;">(Mantenimiento Planta)</span>
+                                                <div style="font-size: 10px; opacity: 0.7; margin-left: 18px; margin-top: 2px;">* Reporta a Dirección y da servicio transversal a ambos turnos.</div>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- FLECHA DE MANDO DEPARTAMENTAL -->
+                <div class="command-connector">
+                    <span class="command-label">Manda Directamente Sobre</span>
+                    <span class="arrow-down">⬇</span>
+                </div>
+
+                <!-- SUBORDINADO (Encargados) -->
+                <div class="role-node subordinate">
+                    <div class="role-header">
+                        <div class="role-name">Encargados de Turno</div>
+                        <div class="level-tag">*** Nivel 3</div>
+                    </div>
+                    <div class="authority-box" style="background: #F8FAFC; border-color: #E2E8F0; color: #334155;">
+                        <strong>🏭 Mando en Planta:</strong>
+                        Mandan sobre la operativa directa de su turno de trabajo, bajo las directrices de Jorge Hernández.
+                    </div>
+                </div>
+            </div>
+
+            <!-- DEPARTAMENTO COMERCIAL -->
+            <div class="dept-card" style="opacity: 0.5;">
+                <div class="dept-title-badge">Área Comercial</div>
+
+                <!-- MANDO (Dirección) -->
+                <div class="role-node boss">
+                    <div class="role-header">
+                        <div class="role-name">Dir. Comercial</div>
+                        <div class="level-tag">** Nivel 2</div>
+                    </div>
+                    <div class="authority-box">
+                        <strong>👑 Manda en Comercial:</strong>
+                        Tiene la máxima autoridad sobre las estrategias de venta, ofertas y cuentas de clientes respecto al resto de departamentos.
+                    </div>
+                </div>
+
+                <!-- FLECHA DE MANDO DEPARTAMENTAL -->
+                <div class="command-connector">
+                    <span class="command-label">Manda Directamente Sobre</span>
+                    <span class="arrow-down">⬇</span>
+                </div>
+
+                <!-- SUBORDINADO (Admin Comercial) -->
+                <div class="role-node subordinate">
+                    <div class="role-header">
+                        <div class="role-name">Admin. Comerciales</div>
+                        <div class="level-tag">*** Nivel 3</div>
+                    </div>
+                    <div class="authority-box" style="background: #F8FAFC; border-color: #E2E8F0; color: #334155;">
+                        <strong>💼 Mando Administrativo:</strong>
+                        Mandan sobre la gestión de clientes y pedidos de producción, bajo las directrices del Director Comercial.
+                    </div>
+                </div>
+            </div>
+
+            <!-- DEPARTAMENTO FINANCIERO -->
+            <div class="dept-card" style="opacity: 0.5;">
+                <div class="dept-title-badge">Área Financiera</div>
+
+                <!-- MANDO (Dirección) -->
+                <div class="role-node boss">
+                    <div class="role-header">
+                        <div class="role-name">Dir. Financiera</div>
+                        <div class="level-tag">** Nivel 2</div>
+                    </div>
+                    <div class="authority-box">
+                        <strong>👑 Manda en Finanzas:</strong>
+                        Tiene la máxima autoridad sobre los presupuestos, cuentas e informes económicos respecto al resto de departamentos.
+                    </div>
+                </div>
+
+                <!-- FLECHA DE MANDO DEPARTAMENTAL -->
+                <div class="command-connector">
+                    <span class="command-label">Manda Directamente Sobre</span>
+                    <span class="arrow-down">⬇</span>
+                </div>
+
+                <!-- SUBORDINADO (Admin Financiero) -->
+                <div class="role-node subordinate">
+                    <div class="role-header">
+                        <div class="role-name">Admin. Financieros</div>
+                        <div class="level-tag">*** Nivel 3</div>
+                    </div>
+                    <div class="authority-box" style="background: #F8FAFC; border-color: #E2E8F0; color: #334155;">
+                        <strong>📊 Mando Contable:</strong>
+                        Mandan sobre la facturación y la contabilidad diaria, bajo las directrices del Director Financiero.
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+</body>
+</html>
